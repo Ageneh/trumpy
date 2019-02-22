@@ -1,10 +1,9 @@
 import json
 import pickle
 
-from trumpytrump import _file_assets, _dir_export, _cached_data_fn, _file_csv_total, _file_csv
+from trumpytrump import _file_assets, _dir_export, _cached_data_fn, _file_csv_total, _file_csv, _dir_csv
 from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
-
 
 
 LIWC_de = _file_assets.format("LIWC_de.dic")
@@ -17,6 +16,8 @@ total_wc = 0
 data = {}
 total_data = {}
 total_outlist = {}
+
+DELIM = ";"
 
 
 def get_cached(fname):
@@ -40,11 +41,11 @@ def export(content, filename):
 
 	filename = filename.split(".")
 
-	with open("{}_{}.{}".format((filename[0],
+	with open("{}_{}.{}".format(filename[0],
 								 str(datetime.datetime.now()),
-								 filename[-1])), "w+") as outfile:
+								 filename[-1]), "w+") as outfile:
 		for data in content:
-			outfile.write("{},{}".format((data[0], data[1])))
+			outfile.write("{},{}".format(data[0], data[1]))
 			outfile.write("\n")
 
 	return filename
@@ -62,8 +63,7 @@ def count_rel(total_wc, outlist=total_outlist):
 	string = []
 	for k, v in list(sorted(outlist.items(), key=lambda x: x[0])):
 		string.append("{},{}%".format(k, str(100 * (v / total_wc))))
-		# string.append("".join(("{}".format(k), "{}\t".format(v), "{:.5} %\t".format(100 * (v / total_wc)))))
-		# string.append("".join(("{:<20}".format(k), "{:<7d}\t".format(v), "{:.5} %\t".format(100 * (v / total_wc)))))
+
 	string.append("{},{}".format("wordcount", total_wc))
 	return "\n".join(string)
 
@@ -81,32 +81,62 @@ def cache_fname(fname):
 	return "{}{}_{}".format(_dir_export, fname, _cached_data_fn)
 
 
-def export_total_output(data):
+def export_csv(data, filename):
+	check_dir(_dir_csv)
+
 	num = 1
-
-	category_names = []
-
 	category_names = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
 
-
-	with open(_file_csv_total, mode="w", encoding="utf-8") as file:
-		file.write(",".join(["#"] + category_names))
+	with open(filename, mode="w", encoding="utf-8") as file:
+		file.write(DELIM.join(["#", "title", "publishDate", "wordcount"] + category_names))
 		file.write("\n")
 
-
 		for title, content in data.items():
+			wc = data[title]["wc"]
 
 			line = [num, title, content["publishDate"], content["wc"]]
 
-			categories = [content["outList"][c] for c in sorted(category_names)]
+			categories = [100 * (content["outList"][c]/wc) for c in sorted(category_names)]
 
 			line += list(categories)
-
-			file.write(",".join(map(lambda x: str(x), line)))
+			file.write(DELIM.join(map(lambda x: "\"{}\"".format(str(x)), line)))
 			file.write("\n")
 
 			num += 1
 
+	return
+
+
+def check_dir(dir):
+	import os
+
+	if os.path.isdir(dir): return
+	os.mkdir(dir)
+
+	return
+
+
+def csv_to_excel(filename):
+	import csv
+	from xlsxwriter.workbook import Workbook
+
+	xlsx_fname = "{}.xlsx".format(filename.split(".")[0])
+	print("CSV:", filename, ", XLSX:", xlsx_fname)
+
+	workbook = Workbook(xlsx_fname, {'strings_to_numbers': True, 'constant_memory': True})
+	worksheet = workbook.add_worksheet()
+
+	with open(filename, mode='r', encoding="utf-8") as csv_file:
+		r = csv.reader(csv_file, delimiter=DELIM, quotechar='"')
+
+		for row_index, row in enumerate(r):
+			for col_index, data in enumerate(row):
+				worksheet.write(row_index, col_index, data)
+
+	workbook.close()
+	print("-------------------------------------------")
+	print("--- .CSV to .XLSX Conversion Successful ---")
+	print("-------------------------------------------\n")
 
 	return
 
@@ -128,11 +158,9 @@ def count():
 			except TypeError:
 				continue
 
-			if articles == {}:
-				continue
+			if articles == {}: continue
 
-			if is_total_export:
-				print("Counting words of \'{}\'".format(fname))
+			print("Counting words of \'{}\'".format(fname))
 
 			data, total_wc, total_outlist = get_cached(cache_fname(fname))
 			if not data:
@@ -167,16 +195,11 @@ def count():
 						pickle.dump((data, total_wc, total_outlist), stream)
 
 			rel = count_rel(total_wc, outlist=total_outlist)
-			print(rel)
 			print(total_outlist)
 
-
-			if is_total_export:
-				export_total_output(data)
-
-			with open(_file_csv.format(fname.split("/")[-1].split(".")[0]), "w") as output:
-				output.write(rel)
-				output.write("\n")
+			csv_fname = _file_csv.format(fname.split("/")[-1].split(".")[0])
+			export_csv(data, csv_fname)
+			csv_to_excel(csv_fname)
 
 
 if __name__ == '__main__':

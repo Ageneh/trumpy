@@ -47,6 +47,6 @@ def readDict(dictionaryPath):
                 workingValue = catList[catnum][0]
             else:
                 workingValue = ""
-                print ("catnum: ", catnum, " not found")
+                # print ("catnum: ", catnum, " not found")
             finalDict[key].append(workingValue)
     return (finalDict, catList.values())
