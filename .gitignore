@@ -1,0 +1,6 @@
+.DS_Store
+//assets/*
+trumpytrump/assets/*
+.idea/
+trumpytrump/.idea/
+trumpytrump/.idea/*
