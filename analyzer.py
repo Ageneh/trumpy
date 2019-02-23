@@ -7,18 +7,10 @@ import pytz
 from multiprocessing.pool import ThreadPool
 from trumpytrump import _file_assets, _file_export, _dir_export
 import word_counter
+from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre, filename, base_filename, base_filename_exp
 
 
 utc = pytz.UTC
-
-# dateinamen
-_base_filename = _file_assets.format("{}_{{}}.json".format("export_harnisch"))
-_base_filename_exp = _file_export.format("{}_{{}}.json".format("export_harnisch"))
-_filename = _base_filename.format("valid")
-_fn_german = _base_filename_exp.format("valid_deutsch")
-_fn_german_pre = _base_filename_exp.format("valid_vor")
-_fn_german_post = _base_filename_exp.format("valid_nach")
-_fn_german_post_filtered = _base_filename_exp.format("valid_nach_gefiltert")
 
 
 # zeitspanne
@@ -61,7 +53,7 @@ def reset_dir():
 
 def start():
 	# path ~ path to json
-	print(_filename)
+	print(filename)
 
 	import os
 	print(os.listdir("."))
@@ -70,7 +62,7 @@ def start():
 	files = os.listdir(cwd)  # Get all the files in that directory
 	print("Files in '%s': %s" % (cwd, files))
 
-	with open(_filename, mode="r", encoding="utf-8") as file:
+	with open(filename, mode="r", encoding="utf-8") as file:
 		file_json = json.load(file)
 	print("Anzahl aller Artikel:", len(file_json))
 
@@ -99,15 +91,15 @@ def start():
 
 	exp = [content_dict[k] for k in result["all"]]
 	print("Anzahl der deutschen Artikel:", len(exp))
-	export(exp, _fn_german)
+	export(exp, fn_german)
 
 	exp = [content_dict[k] for k in result["pre"]]
 	print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
-	export(exp, _fn_german_pre)
+	export(exp, fn_german_pre)
 
 	exp = [content_dict[k] for k in result["post"]]
 	print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(post_date)), len(exp))
-	export(exp, _fn_german_post)
+	export(exp, fn_german_post)
 
 	exp = None
 
@@ -129,7 +121,7 @@ def start():
 				word_data.append(article)
 				filtered_data[p_date.year][word] = word_data
 
-	export(filtered_data, _fn_german_post_filtered)
+	export(filtered_data, fn_german_post_filtered)
 	print("Anzahl der gefilterten Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
 	for year in sorted(filtered_data.keys()):
 		print("Jahr:", year)
@@ -147,4 +139,4 @@ if __name__ == '__main__':
 	start()
 
 	if input("WordCount errechnen? (y/n) - ").lower() == "y":
-		word_counter.count()
+		word_counter.start()
