@@ -91,7 +91,9 @@ def export_csv(data, filename):
 		file.write(DELIM.join(["#", "title", "publishDate", "wordcount"] + category_names))
 		file.write("\n")
 
-		for title, content in data.items():
+		sorted_data = sorted(data.items(), key=lambda x: x[1]["publishDate"])
+
+		for title, content in sorted_data:
 			wc = data[title]["wc"]
 
 			line = [num, title, content["publishDate"], content["wc"]]

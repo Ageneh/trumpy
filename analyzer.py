@@ -65,10 +65,6 @@ def start():
 	import os
 	print(os.listdir("."))
 
-	print(os.path.exists(_filename))
-	print(os.path.exists("trumpytrump/assets/export_harnisch_valid.json"))
-	print(os.path.exists("trumpytrump/export_harnisch_valid.json"))
-
 	cwd = os.getcwd()  # Get the current working directory (cwd)
 	files = os.listdir(cwd)  # Get all the files in that directory
 	print("Files in '%s': %s" % (cwd, files))
@@ -101,16 +97,16 @@ def start():
 	reset_dir()
 
 	exp = [content_dict[k] for k in result["all"]]
+	print("Anzahl der deutschen Artikel:", len(exp))
 	export(exp, _fn_german)
-	print("Anzahl der deutschen Artikel ({} - {}):".format(str(pre_date), str(post_date)), len(exp))
 
 	exp = [content_dict[k] for k in result["pre"]]
-	export(exp, _fn_german_pre)
 	print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
+	export(exp, _fn_german_pre)
 
 	exp = [content_dict[k] for k in result["post"]]
-	export(exp, _fn_german_post)
 	print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(post_date)), len(exp))
+	export(exp, _fn_german_post)
 
 	exp = None
 
