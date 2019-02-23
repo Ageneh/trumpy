@@ -41,8 +41,8 @@ def write2(filename, *args):
 	write(filename)
 	print("2 fertig")
 
-t1 = threading.Thread(target=write1, args=(filename1))
-t2 = threading.Thread(target=write2, args=(filename2))
+t1 = threading.Thread(target=write1, args=[filename1])
+t2 = threading.Thread(target=write2, args=[filename2])
 
 t1.daemon = True
 t2.daemon = True

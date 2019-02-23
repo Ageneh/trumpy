@@ -1,6 +1,10 @@
 import json
 import pickle
+import threading
+import csv
+import datetime
 
+from multiprocessing.pool import ThreadPool
 from trumpytrump import _file_assets, _dir_export, _cached_data_fn, _file_csv_total, _file_csv, _dir_csv
 from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
@@ -18,6 +22,11 @@ total_data = {}
 total_outlist = {}
 
 DELIM = ";"
+QUOTE = '"'
+DIVISION_LEN = 1000
+DIVISION_THRESHOLD = 10000
+
+finalDict, catList = None, None
 
 
 def get_cached(fname):
@@ -88,21 +97,19 @@ def export_csv(data, filename):
 	category_names = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
 
 	with open(filename, mode="w", encoding="utf-8") as file:
-		file.write(DELIM.join(["#", "title", "publishDate", "wordcount"] + category_names))
-		file.write("\n")
+		writer = csv.writer(file, delimiter=DELIM)
+		writer.writerow(["#", "title", "publishDate", "wordcount"] + category_names)
 
 		sorted_data = sorted(data.items(), key=lambda x: x[1]["publishDate"])
 
-		for title, content in sorted_data:
-			wc = data[title]["wc"]
+		for id, content in sorted_data:
+			wc = data[id]["wc"]
 
-			line = [num, title, content["publishDate"], content["wc"]]
-
+			line = [num, content["title"], content["publishDate"], content["wc"]]
 			categories = [100 * (content["outList"][c]/wc) for c in sorted(category_names)]
 
 			line += list(categories)
-			file.write(DELIM.join(map(lambda x: "\"{}\"".format(str(x)), line)))
-			file.write("\n")
+			writer.writerow(line)
 
 			num += 1
 
@@ -119,7 +126,6 @@ def check_dir(dir):
 
 
 def csv_to_excel(filename):
-	import csv
 	from xlsxwriter.workbook import Workbook
 
 	xlsx_fname = "{}.xlsx".format(filename.split(".")[0])
@@ -129,7 +135,7 @@ def csv_to_excel(filename):
 	worksheet = workbook.add_worksheet()
 
 	with open(filename, mode='r', encoding="utf-8") as csv_file:
-		r = csv.reader(csv_file, delimiter=DELIM, quotechar='"')
+		r = csv.reader(csv_file, delimiter=DELIM)
 
 		for row_index, row in enumerate(r):
 			for col_index, data in enumerate(row):
@@ -143,65 +149,160 @@ def csv_to_excel(filename):
 	return
 
 
-def count():
-	finalDict, catList = readDict(LIWC_de)
+def multithread(articles):
 
-	for fname in sorted(get_filenames(), reverse=True):
-		with open(fname, "r") as file:
-			article = json.load(file)
+	def count_multithreaded(vals):
+		start = vals[0]
+		end_incl = vals[1]
+		division = vals[2]
 
-			if fname.split("/")[-1].endswith("_gefiltert.json"):
-				continue
+		print("---- Counting Divison #{}/{} Started ----".format(division, divisons))
 
-			is_total_export = fname.endswith("deutsch.json") # wenn True, dann wird total_output.csv geschrieben
+		total_wc = 0
 
-			try:
-				articles = [x for x in article]
-			except TypeError:
-				continue
+		art = articles[start:end_incl]
 
-			if articles == {}: continue
+		data = {}
 
-			print("Counting words of \'{}\'".format(fname))
+		for articleNum, article in enumerate(art):
 
-			data, total_wc, total_outlist = get_cached(cache_fname(fname))
-			if not data:
+			if not articleNum % 25:
+				print("thread-{:<3} article #{}".format(division, articleNum))
+
+			res = wordCount(article["content"], finalDict, catList)
+			outList, tokens, wc, classified, percClassified = res
+			total_wc += classified
+
+			data[article["id"]] = {
+				"title": article["title"],
+				"outList": outList,
+				# "tokens": tokens,
+				"publishDate": article["publishDate"],
+				"wc": wc,
+				"classified": classified,
+				"percClassified": percClassified
+			}
+
+		print("Divison #{}".format(division))
+
+		print("-------------------------------------------")
+		print("---- Counting Divison #{} Successful ----".format(division))
+		print("-------------------------------------------\n")
+
+		return data, total_wc
+
+	args = []
+	divisons = int(len(articles) / DIVISION_LEN)
+	length = len(articles)
+	start = 0
+	end = DIVISION_LEN
+
+	for div in range(divisons+1):
+		args.append([start, end, div])
+
+		start = end
+		end += DIVISION_LEN
+
+		if end >= length:
+			end = length
+
+
+	pool = ThreadPool(processes=divisons+1)
+	res = pool.map(count_multithreaded, args)
+	pool.close()
+	pool.join()
+
+	print(res)
+
+	data, total_wc = {}, 0
+
+	for r in res:
+		for title, v in r[0].items():
+			data[title] = v
+
+		total_wc += r[1]
+
+
+	return data, total_wc
+
+
+def count_data(fname):
+	start = datetime.datetime.now()
+
+	print("Thread : {}".format(fname))
+
+	with open(fname, "r") as file:
+		article = json.load(file)
+
+		if fname.split("/")[-1].endswith("_gefiltert.json"):
+			return
+
+		try: articles = [x for x in article]
+		except TypeError: return
+
+		if articles == {}: return
+
+		data, total_wc, total_outlist = get_cached(cache_fname(fname))
+
+
+		if not data:
+
+			if len(articles) > DIVISION_THRESHOLD:
+				data, total_wc = multithread(articles[:])
+			else:
 				data = {}
-				for article in articles:
-
-					if not is_total_export:
-						try:
-							print("Counting words of \'{}\' in \'{}\'".format(article["title"], fname))
-						except TypeError as a:
-							pass
-
+				for articleNum, article in enumerate(articles):
 					res = wordCount(article["content"], finalDict, catList)
 					outList, tokens, wc, classified, percClassified = res
 					total_wc += classified
 
-					data[article["title"]] = {
+					data[article["id"]] = {
+						"title": article["id"],
 						"outList": outList,
-						# "tokens": tokens,
 						"publishDate": article["publishDate"],
 						"wc": wc,
 						"classified": classified,
 						"percClassified": percClassified
 					}
 
-				for d in data.values():
-					for k, v in d["outList"].items():
-						total_outlist[k] = total_outlist.get(k, 0) + v
+					if not articleNum % 250: print(articleNum)
 
-				if _cache:
-					with open(cache_fname(fname), "wb") as stream:
-						pickle.dump((data, total_wc, total_outlist), stream)
+			for d in data.values():
+				for k, v in d["outList"].items():
+					total_outlist[k] = total_outlist.get(k, 0) + v
 
-			rel = count_rel(total_wc, outlist=total_outlist)
-			print(total_outlist)
+			if _cache:
+				with open(cache_fname(fname), "wb") as stream:
+					pickle.dump((data, total_wc, total_outlist), stream)
 
-			csv_fname = _file_csv.format(fname.split("/")[-1].split(".")[0])
-			export_csv(data, csv_fname)
-			csv_to_excel(csv_fname)
+		print(total_outlist)
+
+
+		csv_fname = _file_csv.format(fname.split("/")[-1].split(".")[0])
+		export_csv(data, csv_fname)
+		csv_to_excel(csv_fname)
+
+
+
+	end = datetime.datetime.now()
+	diff = end-start
+
+	return "file: {}, len: {}, time: {}".format(fname.split("/")[-1], len(articles), diff)
+
+
+def count():
+	global finalDict, catList
+	finalDict, catList = readDict(LIWC_de)
+
+	fnames = sorted(get_filenames(), reverse=True)
+	pool = ThreadPool(processes=len(fnames))
+
+	res = pool.map(count_data, fnames)
+	pool.close()
+	pool.join()
+
+	for r in res:
+		print(r)
 
 
 if __name__ == '__main__':

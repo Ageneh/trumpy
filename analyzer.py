@@ -4,6 +4,7 @@ from dateutil import parser
 import re
 import pytz
 
+from multiprocessing.pool import ThreadPool
 from trumpytrump import _file_assets, _file_export, _dir_export
 import word_counter
 
@@ -46,7 +47,7 @@ def export(content, filename):
 
 		# path ~ path to filtered json
 		with open(filename, "w+") as outfile:
-			json.dump(content, outfile)
+			json.dump(content, outfile, indent=4, sort_keys=True)
 	except TypeError:
 		for entry in content:
 			entry["publishDate"] = str(entry["publishDate"])
