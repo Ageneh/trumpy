@@ -7,7 +7,7 @@ import pytz
 from multiprocessing.pool import ThreadPool
 from trumpytrump import _file_assets, _file_export, _dir_export
 import word_counter
-from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre, filename, base_filename, base_filename_exp
+from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre, _filename, base_filename, base_filename_exp
 
 
 utc = pytz.UTC
@@ -53,7 +53,7 @@ def reset_dir():
 
 def start():
 	# path ~ path to json
-	print(filename)
+	print(_filename)
 
 	import os
 	print(os.listdir("."))
@@ -62,7 +62,7 @@ def start():
 	files = os.listdir(cwd)  # Get all the files in that directory
 	print("Files in '%s': %s" % (cwd, files))
 
-	with open(filename, mode="r", encoding="utf-8") as file:
+	with open(_filename, mode="r", encoding="utf-8") as file:
 		file_json = json.load(file)
 	print("Anzahl aller Artikel:", len(file_json))
 

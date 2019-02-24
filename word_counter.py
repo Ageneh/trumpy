@@ -1,16 +1,14 @@
 import json
 import pickle
-import threading
-import csv
 import datetime
-import os
 
 from multiprocessing.pool import ThreadPool
 
-from trumpytrump import fn_german, fn_german_post_filtered
-from trumpytrump import _file_assets, _dir_export, _cached_data_fn, _file_csv_total, _file_csv, _dir_csv
+from trumpytrump import *
+from trumpytrump import _file_assets, _dir_export, _file_csv
 from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
+from weekly_counter import WeeklyCounter
 
 
 LIWC_de = _file_assets.format("LIWC_de.dic")
@@ -19,15 +17,9 @@ cached_data = None
 _cache = True
 
 
-total_wc = 0
-data = {}
 total_data = {}
 total_outlist = {}
-
-DELIM = ";"
-QUOTE = '"'
-DIVISION_LEN = 1000
-DIVISION_THRESHOLD = 10000
+categories = []
 
 finalDict, catList = None, None
 
@@ -46,13 +38,9 @@ def get_cached(fname):
 
 
 def get_csv(fname):
-
 	with open(fname, "r") as csv_file:
 		reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
 		return reader
-
-
-	return None
 
 
 def export(content, filename):
@@ -74,7 +62,7 @@ def export(content, filename):
 	return filename
 
 
-def export_cache(fname):
+def export_cache(fname, data, total_wc, total_outlist):
 	if not _cache: return
 
 	with open(cache_fname(fname), "wb") as stream:
@@ -90,93 +78,6 @@ def get_filenames():
 	return map(lambda x: "".join((dir, x)), filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
 
 
-def cache_fname(fname):
-	dir = ""
-	if _dir_export in fname:
-		spl = fname.split("/")
-		dir = "/".join(spl[:-1])
-		fname = spl[-1]
-
-	if "." in fname:
-		fname = fname.split(".")[0]
-
-	return "{}{}_{}".format(_dir_export, fname, _cached_data_fn)
-
-
-def filename(path, suffix=False):
-	if suffix:
-		return path.split("/")[-1]
-	else:
-		return path.split("/")[-1].split(".")[0]
-
-
-
-def check_dir(dir):
-	if os.path.isdir(dir): return
-	os.mkdir(dir)
-
-	return
-
-
-################################################# CSV
-
-
-def export_csv(data, filename):
-	check_dir(_dir_csv)
-
-	num = 1
-	category_names = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
-
-	with open(filename, mode="w", encoding="utf-8") as file:
-		writer = csv.writer(file, delimiter=DELIM)
-		writer.writerow(["#", "title", "publishDate", "wordcount"] + category_names)
-
-		sorted_data = sorted(data.items(), key=lambda x: x[1]["publishDate"])
-
-		for id, content in sorted_data:
-			wc = data[id]["wc"]
-
-			line = [num, content["title"], content["publishDate"], content["wc"]]
-			categories = [100 * (content["outList"][c]/wc) for c in sorted(category_names)]
-
-			line += list(categories)
-			writer.writerow(line)
-
-			num += 1
-
-	return
-
-
-################################################# EXCEL
-
-
-def csv_to_excel(filename):
-	from xlsxwriter.workbook import Workbook
-
-	xlsx_fname = "{}.xlsx".format(filename.split(".")[0])
-	print("CSV:", filename, ", XLSX:", xlsx_fname)
-
-	workbook = Workbook(xlsx_fname, {'strings_to_numbers': True, 'constant_memory': True})
-	worksheet = workbook.add_worksheet(name="Data")
-
-	worksheet.set_column(1, 1, 60)
-	worksheet.set_column(2, 2, 22)
-
-	with open(filename, mode='r', encoding="utf-8") as csv_file:
-		r = csv.reader(csv_file, delimiter=DELIM)
-
-		for row_index, row in enumerate(r):
-			for col_index, data in enumerate(row):
-				worksheet.write(row_index, col_index, data)
-
-	workbook.close()
-	print("-------------------------------------------")
-	print("--- .CSV to .XLSX Conversion Successful ---")
-	print("-------------------------------------------\n")
-
-	return
-
-
 ################################################# CALC
 
 
@@ -184,20 +85,26 @@ def start():
 	global finalDict, catList
 	finalDict, catList = readDict(LIWC_de)
 
-	fnames = sorted(get_filenames(), reverse=True)
+	pre = sorted(get_filenames(), reverse=True)
 	post = set()
 	res_lst = []
 
-	for idx, fname in enumerate(fnames, start=0):
+	for idx, fname in enumerate(pre, start=0):
 		if "_gefiltert.json" in fname:
 			post.add(fname)
-			fnames.remove(fname)
+			pre.remove(fname)
 
-	for lst in (fnames, post)[::-1]:
-		pool = ThreadPool(processes=len(lst))
-		res_lst += list(pool.map(count_data, lst))
-		pool.close()
-		pool.join()
+	pool = ThreadPool(processes=len(pre))
+	res_lst += [x for x in pool.map(count_data, pre)]
+	pool.close()
+	pool.join()
+	pool.terminate()
+
+	pool = ThreadPool(processes=len(pre))
+	res_lst += [x for x in pool.map(count_data, post)]
+	pool.close()
+	pool.join()
+	pool.terminate()
 
 	return res_lst
 
@@ -273,8 +180,8 @@ def multithread(articles, total_wc):
 def singlethreaded(articles, total_wc, multi_division=None):
 	data = {}
 	for articleNum, article in enumerate(articles):
-		if multi_division and not articleNum % 25:
-			print("thread-{:<3} article #{}".format(multi_division, articleNum))
+		# if multi_division and not articleNum % 25:
+		print("thread-{:<3} article #{}".format(multi_division, articleNum))
 
 		res = wordCount(article["content"], finalDict, catList)
 		outList, tokens, wc, classified, percClassified = res
@@ -284,38 +191,65 @@ def singlethreaded(articles, total_wc, multi_division=None):
 	return data, total_wc
 
 
-def count_filtered(json_f, fname):
-	cached_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
-	csv = get_csv(_file_csv.format(filename(fn_german_post_filtered)))
+def count_filtered(fname):
+	global total_data, total_wc
+	if not total_data:
+		total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
 
-	for year, keywords in json_f.items():
-		for keyword, files in keywords.items():
-			print(keyword)
+	outlist = []
+	wc = 0
 
-	return data, total_wc
+	json_f = json.load(open(fname, mode="rb"))
+
+	filtered_data = {}
+
+	for year in json_f.keys():
+		row_idx = 1
+		year_data = {}
+
+		for kw, content in json_f[year].items():
+			kw_data = []
+			for article in content:
+				kw_data.append(total_data[article["id"]])
+				wc += int(total_data[article["id"]]["wc"])
+				outlist += total_data[article["id"]]["outList"]
+
+
+			year_data[kw] = kw_data
+
+		filtered_data[year] = year_data
+
+	return filtered_data, wc, outlist
 
 
 def count_data(fname):
+	articles = None
 	start = datetime.datetime.now()
 
 	is_filtered = False
 
 	print("Thread : {}".format(fname))
 	with open(fname, "r") as file:
-		json_f = json.load(file)
-
 		if fname.split("/")[-1].endswith("_gefiltert.json"):
 			is_filtered = True
 		else:
+			json_f = json.load(file)
+
+		if not is_filtered:
 			try: articles = [x for x in json_f]
 			except TypeError: return
 
-			if articles == {}: return
+			if articles == {}:
+				return
 
 		data, total_wc, total_outlist = get_cached(cache_fname(fname))
 
 		if is_filtered:
-			data, total_wc = count_filtered(json_f, fname)
+			data, wc, outlist = count_filtered(fname)
+			export_cache(fname, data, wc, outlist)
+			export_filtered_csv(data, fname)
+			csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
+			csv_to_excel(csv_fname(fname), cols=[[3, 3, 22]])
 		else:
 			if not data:
 				data, total_wc = multithread(articles[:], total_wc)
@@ -324,17 +258,21 @@ def count_data(fname):
 					for k, v in d["outList"].items():
 						total_outlist[k] = total_outlist.get(k, 0) + v
 
-				export_cache(fname)
+				export_cache(fname, data, total_wc, total_outlist)
 
-		csv_fname = _file_csv.format(fname.split("/")[-1].split(".")[0])
-		export_csv(data, csv_fname)
-		csv_to_excel(csv_fname)
+			if fn_german in fname:
+				global total_data
+				total_data = data
+
+			csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
+			export_csv(data, csvFname)
+			csv_to_excel(csvFname)
 
 
 	end = datetime.datetime.now()
 	diff = end-start
 
-	return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles), diff)
+	return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
 
 
 def count_rel(total_wc, outlist=total_outlist):
@@ -348,6 +286,8 @@ def count_rel(total_wc, outlist=total_outlist):
 
 if __name__ == '__main__':
 	res = start()
-
 	for r in res:
 		print(r)
+
+	w = WeeklyCounter(total_data)
+	w.export()
