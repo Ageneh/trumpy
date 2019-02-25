@@ -107,7 +107,7 @@ def export_csv(data, filename):
 			wc = data[id]["wc"]
 
 			line = [num, content["title"], content["publishDate"], content["wc"]]
-			categories = [100 * (content["outList"][c] / wc) for c in sorted(category_names)]
+			categories = [content["outList"][c] for c in sorted(category_names)]
 
 			line += list(categories)
 			writer.writerow(line)
