@@ -140,3 +140,4 @@ if __name__ == '__main__':
 
 	if input("WordCount errechnen? (y/n) - ").lower() == "y":
 		word_counter.start()
+

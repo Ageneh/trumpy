@@ -105,6 +105,9 @@ def start():
     pool.join()
     pool.terminate()
 
+    w = WeeklyCounter(total_data)
+    w.export()
+
     return res_lst
 
 
