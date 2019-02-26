@@ -1,16 +1,8 @@
-import json
-from datetime import datetime, timedelta
-from dateutil import parser
-import re
-import pytz
-
-from multiprocessing.pool import ThreadPool
+from trumpytrump import *
 from trumpytrump import _file_assets, _file_export, _dir_export
-import word_counter
+from weekly_counter import WeeklyCounter
+from word_counter import WordCounter
 from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre, _filename, base_filename, base_filename_exp
-
-
-utc = pytz.UTC
 
 
 # zeitspanne
@@ -48,16 +40,26 @@ def export(content, filename):
 
 def reset_dir():
 	import shutil
-	shutil.rmtree(_dir_export, ignore_errors=True)
+
+	if os.path.exists(fn_german):
+		for file in os.listdir(_dir_export):
+			path = _file_export.format(file)
+			if os.path.isdir(path):
+				shutil.rmtree(path, ignore_errors=True)
+			elif fn_german != path:
+				os.remove(path)
+
+	else:
+		shutil.rmtree(_dir_export, ignore_errors=True)
+
+
+	return
 
 
 def start():
 	# path ~ path to json
 	print(_filename)
-
-	import os
 	print(os.listdir("."))
-
 	cwd = os.getcwd()  # Get the current working directory (cwd)
 	files = os.listdir(cwd)  # Get all the files in that directory
 	print("Files in '%s': %s" % (cwd, files))
@@ -89,9 +91,10 @@ def start():
 
 	reset_dir()
 
-	exp = [content_dict[k] for k in result["all"]]
-	print("Anzahl der deutschen Artikel:", len(exp))
-	export(exp, fn_german)
+	if not file_exists(fn_german):
+		exp = [content_dict[k] for k in result["all"]]
+		print("Anzahl der deutschen Artikel:", len(exp))
+		export(exp, fn_german)
 
 	exp = [content_dict[k] for k in result["pre"]]
 	print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
@@ -122,7 +125,7 @@ def start():
 				filtered_data[p_date.year][word] = word_data
 
 	export(filtered_data, fn_german_post_filtered)
-	print("Anzahl der gefilterten Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
+	print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
 	for year in sorted(filtered_data.keys()):
 		print("Jahr:", year)
 		for w in sorted(filtered_data[year]):
@@ -130,13 +133,22 @@ def start():
 			print("\"{}\":".format(w), ", ".join(["\'{}\'".format(x["title"]) for x in articles_per_word]))
 		print("")
 
-	# print(filtered_data)
-
 	return
 
 
 if __name__ == '__main__':
+	started = datetime.now()
+
 	start()
 
 	if input("WordCount errechnen? (y/n) - ").lower() == "y":
-		word_counter.start()
+		counter = WordCounter()
+		counter.start()
+
+		weekly = WeeklyCounter(counter)
+		weekly.start()
+
+	ended = datetime.now()
+	print("Time started: {}".format(ended - started))
+	print("Time ended: {}".format(ended - started))
+	print("Total time running: {}".format(ended - started))

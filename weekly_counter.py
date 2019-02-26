@@ -1,20 +1,18 @@
-from pytz import utc
-
 from trumpytrump import *
 from trumpytrump import _file_csv
-from datetime import datetime, timedelta
-from dateutil import parser
 
 
 class WeeklyCounter:
 
 	def __init__(self, data):
+		from word_counter import WordCounter
+		if type(data) == WordCounter:
+			data = data.total_data
+
 		self.data = data
 		self.filename = _file_csv.format("weekly")
-		self.order()
 
-
-	def order(self):
+	def start(self):
 		self.years = {}
 
 		for id, article in self.data.items():
@@ -32,8 +30,8 @@ class WeeklyCounter:
 
 			self.years[year][week] += 1
 
+		self.export()
 		return
-
 
 	def export(self):
 

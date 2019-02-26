@@ -1,5 +1,10 @@
 import os
 import csv
+import json
+from datetime import datetime, timedelta
+from dateutil import parser
+import pytz
+import re
 
 
 DELIM = ";"
@@ -9,6 +14,8 @@ DIVISION_THRESHOLD = 10000
 
 csv_header = None
 
+
+utc = pytz.UTC
 
 _dir_root = "trumpytrump"
 _dir_assets = "{}/".format("assets")
@@ -24,6 +31,9 @@ _file_csv_total = _file_export.format("csv/total_output.csv")
 
 _cached_data_fn = "cache_data.pkl"
 _csv_fn = ".csv"
+
+
+LIWC_de = _file_assets.format("LIWC_de.dic")
 
 
 # dateinamen
@@ -176,3 +186,7 @@ def csv_to_excel(filename, cols=None):
 	print("-------------------------------------------\n")
 
 	return
+
+
+def file_exists(fname):
+	return os.path.exists(fname)
