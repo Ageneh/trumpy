@@ -1,8 +1,40 @@
+import json
+
+from sys import argv, exit
+
 from trumpytrump import *
 from trumpytrump import _file_assets, _file_export, _dir_export
 from weekly_counter import WeeklyCounter
 from word_counter import WordCounter
-from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre, _filename, base_filename, base_filename_exp
+from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre
+from trumpytrump import _filename, base_filename, base_filename_exp
+
+
+def parse_argv(year=2017, month=4, day=2):
+	def exit():
+		raise IOError("Given arguments are invalid: {}".format(" ".join(argv)))
+
+	_date = "-d"
+	if _date in argv:
+		idx = argv.index(_date)
+		date_arg = argv[idx + 1]
+		date_arg = date_arg.split("-")
+		if len(date_arg) < 3:
+			exit()
+		else:
+			try:
+				yyyy, mm, dd = list(map(lambda x: int(x), date_arg))
+			except:
+				exit()
+
+		global scandal_date
+		scandal_date = datetime(year=2017, month=4, day=2).replace(tzinfo=utc)
+
+	else:
+		_scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
+
+	return
+
 
 
 # zeitspanne
@@ -10,7 +42,6 @@ scandal_date = datetime(year=2017, month=4, day=2).replace(tzinfo=utc)
 delta = timedelta(weeks=4)
 pre_date = scandal_date - delta
 post_date = scandal_date + delta
-
 
 # resultat speicher
 result = {
@@ -21,10 +52,106 @@ result = {
 }
 
 
+class Analyzer:
+
+	def __init__(self, *keywords, overwrite=False):
+		self.overwrite = True if overwrite else False
+
+		self.keywords = set(keywords)
+
+		self.filtered_data = {}
+
+		self.result = {
+			"pre": [],
+			"post": [],
+			"all": [],
+			"allSpan": [],
+			"postFiltered": {},
+		}
+
+		self.content_dict = {}
+
+		with open(_filename, mode="r", encoding="utf-8") as file:
+			self.file_json = json.load(file)
+		print("Anzahl aller Artikel:", len(self.file_json))
+
+		return
+
+	def filter(self):
+		for x in self.file_json:
+			# herausfiltern aller deutschen artikel
+			if re.search("(country_de_Deutschland)", x.get("tags2", "")):
+				publishDate = parser.parse(x["publishDate"]).replace(tzinfo=utc)
+				x["publishDate"] = publishDate
+
+				self.result["all"].append(x["title"])
+
+				if pre_date <= publishDate <= post_date:
+					self.result["allSpan"].append(x["title"])
+
+				if pre_date <= publishDate < scandal_date:
+					self.result["pre"].append(x["title"]) # vor skandal
+				elif scandal_date <= publishDate <= post_date:
+					self.result["post"].append(x["title"]) # nach skandal
+
+		self.content_dict = {x["title"]: x for x in self.file_json}  # in ein dict umwandeln
+
+		# filtern nach keywords
+		filtered_data = {}
+		for id in result["post"]:
+			article = self.content_dict[id]
+			stem_words = re.findall("\w+", article["content"].lower())
+
+			p_date = parser.parse(article["publishDate"]).replace(tzinfo=utc)
+			if p_date.year not in filtered_data.keys():
+				filtered_data[p_date.year] = {}
+			year_data = filtered_data.get(p_date.year, {})
+
+			for word in set(stem_words):
+				word_data = year_data.get(word, [])  # kategorisiert nach wort
+				if word in self.keywords:
+					word_data.append(article)
+					filtered_data[p_date.year][word] = word_data
+
+		self.content_dict["postFiltered"] = filtered_data
+
+		return
+
+	def export(self):
+		reset_dir()
+
+		if not file_exists(fn_german):
+			exp = [self.content_dict[k] for k in self.result["all"]]
+			print("Anzahl der deutschen Artikel:", len(exp))
+			export(exp, fn_german)
+
+		exp = [self.content_dict[k] for k in self.result["pre"]]
+		print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
+		export(exp, fn_german_pre)
+
+		exp = [self.content_dict[k] for k in self.result["post"]]
+		print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(post_date)), len(exp))
+		export(exp, fn_german_post)
+
+		export(self.content_dict["postFiltered"], fn_german_post_filtered)
+		if len(self.content_dict["postFiltered"]) > 0:
+			print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
+			for year in sorted(self.filtered_data.keys()):
+				print("Jahr:", year)
+				for w in sorted(self.filtered_data[year]):
+					articles_per_word = self.filtered_data[year][w]
+					print("\"{}\":".format(w), ", ".join(["\'{}\'".format(x["title"]) for x in articles_per_word]))
+				print("")
+
+		return
+
+	def start(self):
+		self.filter()
+		self.export()
+
+
 def export(content, filename):
 	try:
-		import os
-
 		dir = _dir_export
 		if not os.path.exists(dir) or not os.path.isdir(dir):
 			os.makedirs(dir)
@@ -52,94 +179,15 @@ def reset_dir():
 	else:
 		shutil.rmtree(_dir_export, ignore_errors=True)
 
-
-	return
-
-
-def start():
-	# path ~ path to json
-	print(_filename)
-	print(os.listdir("."))
-	cwd = os.getcwd()  # Get the current working directory (cwd)
-	files = os.listdir(cwd)  # Get all the files in that directory
-	print("Files in '%s': %s" % (cwd, files))
-
-	with open(_filename, mode="r", encoding="utf-8") as file:
-		file_json = json.load(file)
-	print("Anzahl aller Artikel:", len(file_json))
-
-	# herausfiltern aller deutschen artikel
-	for x in file_json:
-		if re.search("(country_de_Deutschland)", x.get("tags2", "")):
-			publishDate = parser.parse(x["publishDate"]).replace(tzinfo=utc)
-			x["publishDate"] = publishDate
-
-			result["all"].append(x["id"])
-
-			if pre_date <= publishDate <= post_date:
-				result["allSpan"].append(x["id"])
-
-			if pre_date <= publishDate < scandal_date:
-				# vor skandal
-				result["pre"].append(x["id"])
-			elif scandal_date <= publishDate <= post_date:
-				# nach skandal
-				result["post"].append(x["id"])
-
-	content_dict = {x["id"]: x for x in file_json}  # in ein dict umwandeln
-	file_json = None
-
-	reset_dir()
-
-	if not file_exists(fn_german):
-		exp = [content_dict[k] for k in result["all"]]
-		print("Anzahl der deutschen Artikel:", len(exp))
-		export(exp, fn_german)
-
-	exp = [content_dict[k] for k in result["pre"]]
-	print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
-	export(exp, fn_german_pre)
-
-	exp = [content_dict[k] for k in result["post"]]
-	print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(post_date)), len(exp))
-	export(exp, fn_german_post)
-
-	exp = None
-
-	# filtern nach keywords
-	keywords = {"rakete"}
-	filtered_data = {}
-	for id in result["post"]:
-		article = content_dict[id]
-		stem_words = re.findall("\w+", article["content"].lower())
-
-		p_date = parser.parse(article["publishDate"]).replace(tzinfo=utc)
-		if p_date.year not in filtered_data.keys():
-			filtered_data[p_date.year] = {}
-		year_data = filtered_data.get(p_date.year, {})
-
-		for word in set(stem_words):
-			word_data = year_data.get(word, [])  # kategorisiert nach wort
-			if word in keywords:
-				word_data.append(article)
-				filtered_data[p_date.year][word] = word_data
-
-	export(filtered_data, fn_german_post_filtered)
-	print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
-	for year in sorted(filtered_data.keys()):
-		print("Jahr:", year)
-		for w in sorted(filtered_data[year]):
-			articles_per_word = filtered_data[year][w]
-			print("\"{}\":".format(w), ", ".join(["\'{}\'".format(x["title"]) for x in articles_per_word]))
-		print("")
-
 	return
 
 
 if __name__ == '__main__':
 	started = datetime.now()
 
-	start()
+	analyzer = Analyzer().start()
+
+	print("Analyzer time: {}".format(str(datetime.now() - started)))
 
 	if input("WordCount errechnen? (y/n) - ").lower() == "y":
 		counter = WordCounter()

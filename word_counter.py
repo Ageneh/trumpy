@@ -54,39 +54,10 @@ class WordCounter:
 
 		return res_lst
 
-	def count_filtered(self, fname):
-		global total_data, total_wc
-		if not total_data:
-			total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
-
-		outlist = []
-		wc = 0
-
-		json_f = json.load(open(fname, mode="rb"))
-
-		filtered_data = {}
-
-		for year in json_f.keys():
-			row_idx = 1
-			year_data = {}
-
-			for kw, content in json_f[year].items():
-				kw_data = []
-				for article in content:
-					kw_data.append(total_data[article["id"]])
-					wc += int(total_data[article["id"]]["wc"])
-					outlist += total_data[article["id"]]["outList"]
-
-				year_data[kw] = kw_data
-
-			filtered_data[year] = year_data
-
-		return filtered_data, wc, outlist
-
 	def set_data(self, data, article, wordCount):
 		outList, tokens, wc, classified, percClassified = wordCount
 
-		data[article["id"]] = {
+		data[article["title"]] = {
 			"title": article["title"],
 			"outList": outList,
 			"publishDate": article["publishDate"],
@@ -162,6 +133,7 @@ class WordCounter:
 		return data, total_wc
 
 	def count_data(self, fname):
+
 		articles = None
 		start = datetime.now()
 
@@ -174,7 +146,6 @@ class WordCounter:
 			else:
 				json_f = json.load(file)
 
-			if not is_filtered:
 				try:
 					articles = [x for x in json_f]
 				except TypeError:
@@ -199,6 +170,12 @@ class WordCounter:
 						for k, v in d["outList"].items():
 							total_outlist[k] = total_outlist.get(k, 0) + v
 
+					for k, v in data.items():
+						wc = int(v["wc"])
+						for cat, count in v["outList"].items():
+							count = int(count)
+							data[k]["outList"][cat] = 100 * (count / wc)
+
 					export_cache(fname, data, total_wc, total_outlist)
 
 				if fn_german in fname:
@@ -215,6 +192,34 @@ class WordCounter:
 
 		return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
 
+	def count_filtered(self, fname):
+		global total_data, total_wc
+		if not total_data:
+			total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
+
+		outlist = []
+		wc = 0
+
+		json_f = json.load(open(fname, mode="rb"))
+
+		filtered_data = {}
+
+		for year in json_f.keys():
+			year_data = {}
+
+			for kw, content in json_f[year].items():
+				kw_data = []
+				for article in content:
+					kw_data.append(total_data[article["title"]])
+					wc += int(total_data[article["title"]]["wc"])
+					outlist += total_data[article["title"]]["outList"]
+
+				year_data[kw] = kw_data
+
+			filtered_data[year] = year_data
+
+		return filtered_data, wc, outlist
+
 	def count_rel(self, total_wc, outlist=None):
 		if not outlist:
 			outlist = self.total_outlist
@@ -228,16 +233,6 @@ class WordCounter:
 
 
 ################################################# I/O
-
-
-def get_cached(fname):
-	if _cache and os.path.exists(fname):
-		with open(fname, mode="rb") as stream:
-			cached_data, total_wc, total_outlist = pickle.load(stream)
-			return cached_data, total_wc, total_outlist
-	else:
-		cached_data = None
-		return None, 0, {}
 
 
 def get_csv(fname):
@@ -285,6 +280,7 @@ if __name__ == '__main__':
 	res = counter.start()
 
 	w = WeeklyCounter(total_data)
+	w.start()
 	w.export()
 
 	for r in res: print(r)

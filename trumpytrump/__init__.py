@@ -1,6 +1,7 @@
 import os
 import csv
 import json
+import pickle
 from datetime import datetime, timedelta
 from dateutil import parser
 import pytz
@@ -190,3 +191,15 @@ def csv_to_excel(filename, cols=None):
 
 def file_exists(fname):
 	return os.path.exists(fname)
+
+
+################################################# IO
+
+def get_cached(fname, cache=True):
+	if cache and os.path.exists(fname):
+		with open(fname, mode="rb") as stream:
+			cached_data, total_wc, total_outlist = pickle.load(stream)
+			return cached_data, total_wc, total_outlist
+	else:
+		cached_data = None
+		return None, 0, {}
