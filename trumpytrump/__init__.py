@@ -37,6 +37,9 @@ _csv_fn = ".csv"
 LIWC_de = _file_assets.format("LIWC_de.dic")
 
 
+category_names = []
+
+
 # dateinamen
 base_filename = _file_assets.format("{}_{{}}.json".format("export_harnisch"))
 base_filename_exp = _file_export.format("{}_{{}}.json".format("export_harnisch"))
@@ -100,10 +103,11 @@ def export_csv(data, filename):
 	num = 1
 
 	try:
-		categories = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
-		category_names = categories
+		global category_names
+		# categories = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
+		category_names = sorted(category_names)
 	except IndexError as e:
-		pass
+		exit(1)
 
 	with open(filename, mode="w", encoding="utf-8") as file:
 		writer = csv.writer(file, delimiter=DELIM, quotechar=QUOTE)

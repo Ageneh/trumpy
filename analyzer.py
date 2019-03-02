@@ -10,33 +10,6 @@ from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_g
 from trumpytrump import _filename, base_filename, base_filename_exp
 
 
-def parse_argv(year=2017, month=4, day=2):
-	def exit():
-		raise IOError("Given arguments are invalid: {}".format(" ".join(argv)))
-
-	_date = "-d"
-	if _date in argv:
-		idx = argv.index(_date)
-		date_arg = argv[idx + 1]
-		date_arg = date_arg.split("-")
-		if len(date_arg) < 3:
-			exit()
-		else:
-			try:
-				yyyy, mm, dd = list(map(lambda x: int(x), date_arg))
-			except:
-				exit()
-
-		global scandal_date
-		scandal_date = datetime(year=2017, month=4, day=2).replace(tzinfo=utc)
-
-	else:
-		_scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
-
-	return
-
-
-
 # zeitspanne
 scandal_date = datetime(year=2017, month=4, day=2).replace(tzinfo=utc)
 delta = timedelta(weeks=4)
@@ -146,6 +119,7 @@ class Analyzer:
 		return
 
 	def start(self):
+		parse_argv()
 		self.filter()
 		self.export()
 
@@ -180,6 +154,43 @@ def reset_dir():
 		shutil.rmtree(_dir_export, ignore_errors=True)
 
 	return
+
+
+def parse_argv(year=2017, month=4, day=2):
+	global scandal_date
+	scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
+
+	def exit():
+		raise OSError("Given arguments are invalid: {}".format(" ".join(argv[1:])))
+
+	_date = "-d"
+	_duration = "-w"
+	if _date in argv:
+		idx = argv.index(_date)
+		date_arg = argv[idx + 1]
+		date_arg = date_arg.split("-")
+		if len(date_arg) < 3:
+			exit()
+		else:
+			try:
+				year, month, day = list(map(lambda x: int(x), date_arg))
+			except:
+				exit()
+
+			scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
+
+	if _duration in argv:
+		idx = argv.index(_duration)
+		dur_arg = argv[idx + 1]
+		try:
+			duration = int(dur_arg)
+			global delta
+			delta = timedelta(weeks=duration)
+		except ValueError:
+			exit()
+
+
+	return year, month, day
 
 
 if __name__ == '__main__':

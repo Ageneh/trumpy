@@ -133,6 +133,7 @@ class WordCounter:
 		return data, total_wc
 
 	def count_data(self, fname):
+		from trumpytrump import category_names
 
 		articles = None
 		start = datetime.now()
@@ -155,6 +156,9 @@ class WordCounter:
 					return
 
 			data, total_wc, total_outlist = get_cached(cache_fname(fname))
+
+			if not category_names:
+				category_names = sorted(total_outlist.keys())
 
 			if is_filtered:
 				data, wc, outlist = self.count_filtered(fname)
