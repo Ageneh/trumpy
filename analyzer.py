@@ -75,7 +75,6 @@ class Analyzer:
 		self.content_dict = {x["title"]: x for x in self.file_json if x["title"] in self.result["all"]}  # in ein dict umwandeln
 
 		pres = [self.content_dict[x] for x in self.result["pre"]]
-		print(min(map(lambda x: x["publishDate"], pres), key=lambda x: "publishDate"))
 
 
 		# filtern nach keywords
