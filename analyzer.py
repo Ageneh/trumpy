@@ -10,12 +10,6 @@ from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_g
 from trumpytrump import _filename, base_filename, base_filename_exp
 
 
-# zeitspanne
-scandal_date = datetime(year=2017, month=4, day=2).replace(tzinfo=utc)
-delta = timedelta(weeks=4)
-pre_date = scandal_date - delta
-post_date = scandal_date + delta
-
 # resultat speicher
 result = {
 	"pre": [],
@@ -29,6 +23,16 @@ class Analyzer:
 
 	def __init__(self, *keywords, overwrite=False):
 		self.overwrite = True if overwrite else False
+
+		# zeitspanne
+		y, m, d, weeks = parse_argv()
+		self.scandal_date = datetime(year=y, month=m, day=d).replace(tzinfo=utc)
+		self.delta = timedelta(weeks=weeks)
+		self.pre_date = scandal_date - self.delta
+		self.post_date = scandal_date + self.delta
+
+		print(self.scandal_date, weeks)
+		print("Von {} bis {}".format(self.pre_date,self.post_date))
 
 		self.keywords = set(keywords)
 		self.filtered_data = {}
@@ -62,13 +66,13 @@ class Analyzer:
 				if title not in self.result["all"]:
 					self.result["all"].append(entry["title"])
 
-				if pre_date <= publishDate <= post_date and title not in self.result["allSpan"]:
+				if self.pre_date <= publishDate <= self.post_date and title not in self.result["allSpan"]:
 					self.result["allSpan"].append(entry["title"])
 
-				if pre_date <= publishDate < scandal_date and title not in self.result["pre"]:
+				if self.pre_date <= publishDate < scandal_date and title not in self.result["pre"]:
 					self.result["pre"].append(entry["title"])  # vor skandal
 
-				elif scandal_date <= publishDate <= post_date and title not in self.result["post"]:
+				elif scandal_date <= publishDate <= self.post_date and title not in self.result["post"]:
 					self.result["post"].append(entry["title"])  # nach skandal
 
 
@@ -106,16 +110,16 @@ class Analyzer:
 			export(exp, fn_german)
 
 		exp = [self.content_dict[k] for k in self.result["pre"]]
-		print("Anzahl der deutschen Artikel ({} - {}):".format(str(pre_date), str(scandal_date)), len(exp))
+		print("Anzahl der deutschen Artikel ({} - {}):".format(str(self.pre_date), str(scandal_date)), len(exp))
 		export(exp, fn_german_pre)
 
 		exp = [self.content_dict[k] for k in self.result["post"]]
-		print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(post_date)), len(exp))
+		print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(self.post_date)), len(exp))
 		export(exp, fn_german_post)
 
 		export(self.content_dict["postFiltered"], fn_german_post_filtered)
 		if len(self.content_dict["postFiltered"]) > 0:
-			print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(post_date)))
+			print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(self.post_date)))
 			for year in sorted(self.filtered_data.keys()):
 				print("Jahr:", year)
 				for w in sorted(self.filtered_data[year]):
@@ -126,7 +130,6 @@ class Analyzer:
 		return
 
 	def start(self):
-		parse_argv()
 		self.filter()
 		self.export()
 
@@ -191,13 +194,11 @@ def parse_argv(year=2017, month=4, day=2):
 		dur_arg = argv[idx + 1]
 		try:
 			duration = int(dur_arg)
-			global delta
-			delta = timedelta(weeks=duration)
 		except ValueError:
 			exit()
 
 
-	return year, month, day
+	return year, month, day, duration
 
 
 if __name__ == '__main__':
