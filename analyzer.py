@@ -68,8 +68,6 @@ class Analyzer:
 				if pre_date <= publishDate < scandal_date and title not in self.result["pre"]:
 					self.result["pre"].append(entry["title"])  # vor skandal
 
-					print("PRE: ", publishDate)
-
 				elif scandal_date <= publishDate <= post_date and title not in self.result["post"]:
 					self.result["post"].append(entry["title"])  # nach skandal
 
@@ -85,7 +83,7 @@ class Analyzer:
 		for article in map(lambda x: self.content_dict[x], self.result["post"]):
 			stem_words = re.findall("\w+", article["content"].lower())
 
-			p_date = parser.parse(article["publishDate"]).replace(tzinfo=utc)
+			p_date = article["publishDate"]
 			if p_date.year not in filtered_data.keys():
 				filtered_data[p_date.year] = {}
 			year_data = filtered_data.get(p_date.year, {})
@@ -109,7 +107,6 @@ class Analyzer:
 			export(exp, fn_german)
 
 		exp = [self.content_dict[k] for k in self.result["pre"]]
-		print(sorted(map(lambda x: parser.parse(str(x["publishDate"])).replace(tzinfo=utc), exp)))
 		print("Anzahl der deutschen Artikel ({} - {}):".format(str(pre_date), str(scandal_date)), len(exp))
 		export(exp, fn_german_pre)
 
