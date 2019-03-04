@@ -8,10 +8,8 @@ from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
 from weekly_counter import WeeklyCounter
 
-
 cached_data = None
 _cache = True
-
 
 total_data = {}
 total_outlist = {}
@@ -19,272 +17,271 @@ categories = []
 
 finalDict, catList = None, None
 
+
 class WordCounter:
 
-	def __init__(self, cache=True):
-		self.total_data = {}
-		self._cache = True
-		self.total_outlist = {}
-		self.category_names = []
-		return
+    def __init__(self, cache=True):
+        self.total_data = {}
+        self._cache = True
+        self.total_outlist = {}
 
-	def start(self):
-		global finalDict, catList
-		finalDict, catList = readDict(LIWC_de)
+        global finalDict, catList
+        finalDict, catList = readDict(LIWC_de)
+        self.category_names = sorted(wordCount("", finalDict, catList)[0].keys())
 
-		pre = sorted(get_filenames(), reverse=True)
-		post = set()
-		res_lst = []
+        return
 
-		for idx, fname in enumerate(pre, start=0):
-			if "_gefiltert.json" in fname:
-				post.add(fname)
-				pre.remove(fname)
+    def start(self):
+        pre = sorted(get_filenames(), reverse=True)
+        post = set()
+        res_lst = []
 
-		pool = ThreadPool(processes=len(pre))
-		res_lst += [x for x in pool.map(self.count_data, pre)]
-		pool.close()
-		pool.join()
-		pool.terminate()
+        for idx, fname in enumerate(pre, start=0):
+            if "_gefiltert.json" in fname:
+                post.add(fname)
+                pre.remove(fname)
 
-		pool = ThreadPool(processes=len(post))
-		res_lst += [x for x in pool.map(self.count_data, post)]
-		pool.close()
-		pool.join()
-		pool.terminate()
+        pool = ThreadPool(processes=len(pre))
+        res_lst += [x for x in pool.map(self.count_data, pre)]
+        pool.close()
+        pool.join()
+        pool.terminate()
 
-		return res_lst
+        pool = ThreadPool(processes=len(post))
+        res_lst += [x for x in pool.map(self.count_data, post)]
+        pool.close()
+        pool.join()
+        pool.terminate()
 
-	def set_data(self, data, article, wordCount):
-		outList, tokens, wc, classified, percClassified = wordCount
+        return res_lst
 
-		data[article["title"]] = {
-			"title": article["title"],
-			"outList": outList,
-			"publishDate": article["publishDate"],
-			"wc": wc,
-			"classified": classified,
-			"percClassified": percClassified
-		}
+    def set_data(self, data, article, wordCount):
+        outList, tokens, wc, classified, percClassified = wordCount
 
-		return data
+        data[article["title"]] = {
+            "title": article["title"],
+            "outList": outList,
+            "publishDate": article["publishDate"],
+            "wc": wc,
+            "classified": classified,
+            "percClassified": percClassified
+        }
 
-	def multithread(self, articles, total_wc):
+        return data
 
-		def count_multithreaded(vals):
-			start = vals[0]
-			end_incl = vals[1]
-			division = vals[2]
+    def multithread(self, articles, total_wc):
 
-			print("---- Counting Divison #{}/{} Started ----".format(division, divisons))
+        def count_multithreaded(vals):
+            start = vals[0]
+            end_incl = vals[1]
+            division = vals[2]
 
-			total_wc = 0
-			data = {}
-			articles_span = articles[start:end_incl]
-			data, total_wc = self.singlethreaded(articles_span, total_wc, multi_division=division)
+            print("---- Counting Divison #{}/{} Started ----".format(division, divisons))
 
-			print("Divison #{}".format(division))
+            total_wc = 0
+            data = {}
+            articles_span = articles[start:end_incl]
+            data, total_wc = self.singlethreaded(articles_span, total_wc, multi_division=division)
 
-			msg = "---- Counting Divison #{} Successful ----".format(division)
+            print("Divison #{}".format(division))
 
-			print("-" * len(msg))
-			print(msg)
-			print("-" * len(msg))
+            msg = "---- Counting Divison #{} Successful ----".format(division)
 
-			return data, total_wc
+            print("-" * len(msg))
+            print(msg)
+            print("-" * len(msg))
 
-		args = []
-		divisons = int(len(articles) / DIVISION_LEN)
-		length = len(articles)
-		start = 0
-		end = DIVISION_LEN
+            return data, total_wc
 
-		for div in range(divisons + 1):
-			args.append([start, end, div])
+        args = []
+        divisons = int(len(articles) / DIVISION_LEN)
+        length = len(articles)
+        start = 0
+        end = DIVISION_LEN
 
-			start = end
-			end += DIVISION_LEN
-			end = length if end >= length else end
+        for div in range(divisons + 1):
+            args.append([start, end, div])
 
-		pool = ThreadPool(processes=divisons + 1)
-		res = pool.map(count_multithreaded, args)
-		pool.close()
-		pool.join()
+            start = end
+            end += DIVISION_LEN
+            end = length if end >= length else end
 
-		data = {}
-		for r in res:
-			for title, v in r[0].items():
-				data[title] = v
+        pool = ThreadPool(processes=divisons + 1)
+        res = pool.map(count_multithreaded, args)
+        pool.close()
+        pool.join()
 
-			total_wc += r[1]
+        data = {}
+        for r in res:
+            for title, v in r[0].items():
+                data[title] = v
 
-		return data, total_wc
+            total_wc += r[1]
 
-	def singlethreaded(self, articles, total_wc, multi_division=None):
-		data = {}
-		for articleNum, article in enumerate(articles):
-			if multi_division and not articleNum % 25:
-				print("thread-{:<3} article #{}".format(multi_division, articleNum))
+        return data, total_wc
 
-			res = wordCount(article["content"], finalDict, catList)
-			outList, tokens, wc, classified, percClassified = res
-			total_wc += classified
-			data = self.set_data(data, article, res)
+    def singlethreaded(self, articles, total_wc, multi_division=None):
+        data = {}
+        for articleNum, article in enumerate(articles):
+            if multi_division and not articleNum % 25:
+                print("thread-{:<3} article #{}".format(multi_division, articleNum))
 
-		return data, total_wc
+            res = wordCount(article["content"], finalDict, catList)
+            outList, tokens, wc, classified, percClassified = res
+            total_wc += classified
+            data = self.set_data(data, article, res)
 
-	def count_data(self, fname):
-		from trumpytrump import category_names
+        return data, total_wc
 
-		articles = None
-		start = datetime.now()
+    def count_data(self, fname):
+        from trumpytrump import category_names
 
-		is_filtered = False
+        articles = None
+        start = datetime.now()
 
-		print("Thread : {}".format(fname))
-		with open(fname, "r") as file:
-			if fname.split("/")[-1].endswith("_gefiltert.json"):
-				is_filtered = True
-			else:
-				json_f = json.load(file)
+        is_filtered = False
 
-				try:
-					articles = [x for x in json_f]
-				except TypeError:
-					return
+        print("Thread : {}".format(fname))
+        with open(fname, "r") as file:
+            if fname.split("/")[-1].endswith("_gefiltert.json"):
+                is_filtered = True
+            else:
+                json_f = json.load(file)
 
-				if articles == {}:
-					return
+                try:
+                    articles = [x for x in json_f]
+                except TypeError:
+                    return
 
-			data, total_wc, total_outlist = get_cached(cache_fname(fname))
+                if articles == {}:
+                    return
 
-			if not self.category_names:
-				self.category_names = sorted(total_outlist.keys())
+            data, total_wc, total_outlist = get_cached(cache_fname(fname))
 
-			if is_filtered:
-				data, wc, outlist = self.count_filtered(fname)
-				export_cache(fname, data, wc, outlist)
-				export_filtered_csv(data, fname, category_names=self.category_names)
-				csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
-			else:
-				if not data:
-					data, total_wc = self.multithread(articles[:], total_wc)
+            if is_filtered:
+                data, wc, outlist = self.count_filtered(fname)
 
-					for d in data.values():
-						for k, v in d["outList"].items():
-							total_outlist[k] = total_outlist.get(k, 0) + v
+                export_cache(fname, data, wc, outlist)
+                export_filtered_csv(data, fname, category_names=self.category_names)
+                csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
+            else:
+                if not data:
+                    data, total_wc = self.multithread(articles[:], total_wc)
 
-					for k, v in data.items():
-						wc = int(v["wc"])
-						for cat, count in v["outList"].items():
-							count = int(count)
-							data[k]["outList"][cat] = 100 * (count / wc)
+                    for d in data.values():
+                        for k, v in d["outList"].items():
+                            total_outlist[k] = total_outlist.get(k, 0) + v
 
-					export_cache(fname, data, total_wc, total_outlist)
+                    for k, v in data.items():
+                        wc = int(v["wc"])
+                        for cat, count in v["outList"].items():
+                            count = int(count)
+                            data[k]["outList"][cat] = 100 * (count / wc)
 
-				if fn_german in fname:
-					global total_data
-					self.total_data = data
-					self.total_outlist = total_outlist
+                    export_cache(fname, data, total_wc, total_outlist)
 
-				csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
-				export_csv(data, csvFname, category_names=self.category_names)
-				csv_to_excel(csvFname)
+                if fn_german in fname:
+                    global total_data
+                    self.total_data = data
+                    self.total_outlist = total_outlist
 
-		end = datetime.now()
-		diff = end - start
+                csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
+                export_csv(data, csvFname, category_names=self.category_names)
+                csv_to_excel(csvFname)
 
-		return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
+        end = datetime.now()
+        diff = end - start
 
-	def count_filtered(self, fname):
-		global total_data, total_wc
-		if not total_data:
-			total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
+        return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
 
-		outlist = []
-		wc = 0
+    def count_filtered(self, fname):
+        global total_data, total_wc
+        if not total_data:
+            total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
 
-		json_f = json.load(open(fname, mode="rb"))
+        outlist = []
+        wc = 0
+        json_f = json.load(open(fname, mode="rb"))
+        filtered_data = {}
 
-		filtered_data = {}
+        for year in json_f.keys():
+            year_data = {}
 
-		for year in json_f.keys():
-			year_data = {}
+            for kw, content in json_f[year].items():
+                kw_data = []
+                for article in content:
+                    kw_data.append(total_data[article["title"]])
+                    wc += int(total_data[article["title"]]["wc"])
+                    outlist += total_data[article["title"]]["outList"]
 
-			for kw, content in json_f[year].items():
-				kw_data = []
-				for article in content:
-					kw_data.append(total_data[article["title"]])
-					wc += int(total_data[article["title"]]["wc"])
-					outlist += total_data[article["title"]]["outList"]
+                year_data[kw] = kw_data
 
-				year_data[kw] = kw_data
+            filtered_data[year] = year_data
 
-			filtered_data[year] = year_data
+        return filtered_data, wc, outlist
 
-		return filtered_data, wc, outlist
+    def count_rel(self, total_wc, outlist=None):
+        if not outlist:
+            outlist = self.total_outlist
 
-	def count_rel(self, total_wc, outlist=None):
-		if not outlist:
-			outlist = self.total_outlist
+        string = []
+        for k, v in list(sorted(outlist.items(), key=lambda x: x[0])):
+            string.append("{},{}%".format(k, str(100 * (v / total_wc))))
 
-		string = []
-		for k, v in list(sorted(outlist.items(), key=lambda x: x[0])):
-			string.append("{},{}%".format(k, str(100 * (v / total_wc))))
-
-		string.append("{},{}".format("wordcount", total_wc))
-		return "\n".join(string)
+        string.append("{},{}".format("wordcount", total_wc))
+        return "\n".join(string)
 
 
 ################################################# I/O
 
 
 def get_csv(fname):
-	with open(fname, "r") as csv_file:
-		reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
-		return reader
+    with open(fname, "r") as csv_file:
+        reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
+        return reader
 
 
 def export(content, filename):
-	import os
-	import datetime
+    import os
+    import datetime
 
-	if not os.path.exists("export/output/") or not os.path.isdir("export/output/"):
-		os.makedirs("export/output/")
+    if not os.path.exists("export/output/") or not os.path.isdir("export/output/"):
+        os.makedirs("export/output/")
 
-	filename = filename.split(".")
+    filename = filename.split(".")
 
-	with open("{}_{}.{}".format(filename[0],
-								 str(datetime.datetime.now()),
-								 filename[-1]), "w+") as outfile:
-		for data in content:
-			outfile.write("{},{}".format(data[0], data[1]))
-			outfile.write("\n")
+    with open("{}_{}.{}".format(filename[0],
+                                str(datetime.datetime.now()),
+                                filename[-1]), "w+") as outfile:
+        for data in content:
+            outfile.write("{},{}".format(data[0], data[1]))
+            outfile.write("\n")
 
-	return filename
+    return filename
 
 
 def export_cache(fname, data, total_wc, total_outlist):
-	if not _cache: return
+    if not _cache: return
 
-	with open(cache_fname(fname), "wb") as stream:
-		pickle.dump((data, total_wc, total_outlist), stream)
+    with open(cache_fname(fname), "wb") as stream:
+        pickle.dump((data, total_wc, total_outlist), stream)
 
-	return
+    return
 
 
 def get_filenames():
-	global filenames
-	dir = _dir_export
-	return map(lambda x: "".join((dir, x)), filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
+    global filenames
+    dir = _dir_export
+    return map(lambda x: "".join((dir, x)),
+               filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
 
 
 if __name__ == '__main__':
-	counter = WordCounter()
-	res = counter.start()
+    counter = WordCounter()
+    res = counter.start()
 
-	w = WeeklyCounter(total_data)
-	w.start()
-	w.export()
+    w = WeeklyCounter(total_data)
+    w.start()
+    w.export()
 
-	for r in res: print(r)
+    for r in res: print(r)

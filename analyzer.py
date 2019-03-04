@@ -31,9 +31,7 @@ class Analyzer:
 		self.overwrite = True if overwrite else False
 
 		self.keywords = set(keywords)
-
 		self.filtered_data = {}
-
 		self.result = {
 			"pre": [],
 			"post": [],
@@ -41,37 +39,42 @@ class Analyzer:
 			"allSpan": [],
 			"postFiltered": {},
 		}
-
 		self.content_dict = {}
 
 		with open(_filename, mode="r", encoding="utf-8") as file:
 			self.file_json = json.load(file)
+			self.jsonDict = {x["title"]: x for x in self.file_json}
+			for k in self.jsonDict:
+				date = self.jsonDict[k]["publishDate"]
+				self.jsonDict[k]["publishDate"] = parser.parse(date).replace(tzinfo=utc)
+
 		print("Anzahl aller Artikel:", len(self.file_json))
 
 		return
 
 	def filter(self):
-		for x in self.file_json:
+
+		for title, entry in self.jsonDict.items():
 			# herausfiltern aller deutschen artikel
-			if re.search("(country_de_Deutschland)", x.get("tags2", "")):
-				publishDate = parser.parse(x["publishDate"]).replace(tzinfo=utc)
-				x["publishDate"] = publishDate
+			if re.search("(country_de_Deutschland)", entry.get("tags2", "")):
+				publishDate = entry["publishDate"]
 
-				self.result["all"].append(x["title"])
+				if title not in self.result["all"]:
+					self.result["all"].append(entry["title"])
 
-				if pre_date <= publishDate <= post_date:
-					self.result["allSpan"].append(x["title"])
+				if pre_date <= publishDate <= post_date and title not in self.result["allSpan"]:
+					self.result["allSpan"].append(entry["title"])
 
-				if pre_date <= publishDate < scandal_date:
-					self.result["pre"].append(x["title"]) # vor skandal
-				elif scandal_date <= publishDate <= post_date:
-					self.result["post"].append(x["title"]) # nach skandal
+				if pre_date <= publishDate < scandal_date and title not in self.result["pre"]:
+					self.result["pre"].append(entry["title"])  # vor skandal
 
-		self.result["all"] = set(self.result["all"])
+					print("PRE: ", publishDate)
+
+				elif scandal_date <= publishDate <= post_date and title not in self.result["post"]:
+					self.result["post"].append(entry["title"])  # nach skandal
+
+
 		self.content_dict = {x["title"]: x for x in self.file_json if x["title"] in self.result["all"]}  # in ein dict umwandeln
-
-		for k in self.content_dict.keys():
-			self.content_dict[k]["publishDate"] = parser.parse(str(self.content_dict[k]["publishDate"])).replace(tzinfo=utc)
 
 		pres = [self.content_dict[x] for x in self.result["pre"]]
 		print(min(map(lambda x: x["publishDate"], pres), key=lambda x: "publishDate"))
@@ -79,8 +82,7 @@ class Analyzer:
 
 		# filtern nach keywords
 		filtered_data = {}
-		for id in self.result["post"]:
-			article = self.content_dict[id]
+		for article in map(lambda x: self.content_dict[x], self.result["post"]):
 			stem_words = re.findall("\w+", article["content"].lower())
 
 			p_date = parser.parse(article["publishDate"]).replace(tzinfo=utc)
