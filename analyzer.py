@@ -67,11 +67,19 @@ class Analyzer:
 				elif scandal_date <= publishDate <= post_date:
 					self.result["post"].append(x["title"]) # nach skandal
 
-		self.content_dict = {x["title"]: x for x in self.file_json}  # in ein dict umwandeln
+		self.result["all"] = set(self.result["all"])
+		self.content_dict = {x["title"]: x for x in self.file_json if x["title"] in self.result["all"]}  # in ein dict umwandeln
+
+		for k in self.content_dict.keys():
+			self.content_dict[k]["publishDate"] = parser.parse(str(self.content_dict[k]["publishDate"])).replace(tzinfo=utc)
+
+		pres = [self.content_dict[x] for x in self.result["pre"]]
+		print(min(map(lambda x: x["publishDate"], pres), key=lambda x: "publishDate"))
+
 
 		# filtern nach keywords
 		filtered_data = {}
-		for id in result["post"]:
+		for id in self.result["post"]:
 			article = self.content_dict[id]
 			stem_words = re.findall("\w+", article["content"].lower())
 
@@ -99,7 +107,8 @@ class Analyzer:
 			export(exp, fn_german)
 
 		exp = [self.content_dict[k] for k in self.result["pre"]]
-		print("Anzahl der deutschen Artikel ({} - {}):".format(str(post_date), str(scandal_date)), len(exp))
+		print(sorted(map(lambda x: parser.parse(str(x["publishDate"])).replace(tzinfo=utc), exp)))
+		print("Anzahl der deutschen Artikel ({} - {}):".format(str(pre_date), str(scandal_date)), len(exp))
 		export(exp, fn_german_pre)
 
 		exp = [self.content_dict[k] for k in self.result["post"]]

@@ -25,6 +25,7 @@ class WordCounter:
 		self.total_data = {}
 		self._cache = True
 		self.total_outlist = {}
+		self.category_names = []
 		return
 
 	def start(self):
@@ -46,7 +47,7 @@ class WordCounter:
 		pool.join()
 		pool.terminate()
 
-		pool = ThreadPool(processes=len(pre))
+		pool = ThreadPool(processes=len(post))
 		res_lst += [x for x in pool.map(self.count_data, post)]
 		pool.close()
 		pool.join()
@@ -157,15 +158,14 @@ class WordCounter:
 
 			data, total_wc, total_outlist = get_cached(cache_fname(fname))
 
-			if not category_names:
-				category_names = sorted(total_outlist.keys())
+			if not self.category_names:
+				self.category_names = sorted(total_outlist.keys())
 
 			if is_filtered:
 				data, wc, outlist = self.count_filtered(fname)
 				export_cache(fname, data, wc, outlist)
-				export_filtered_csv(data, fname)
+				export_filtered_csv(data, fname, category_names=self.category_names)
 				csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
-				csv_to_excel(csv_fname(fname), cols=[[3, 3, 22]])
 			else:
 				if not data:
 					data, total_wc = self.multithread(articles[:], total_wc)
@@ -188,7 +188,7 @@ class WordCounter:
 					self.total_outlist = total_outlist
 
 				csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
-				export_csv(data, csvFname)
+				export_csv(data, csvFname, category_names=self.category_names)
 				csv_to_excel(csvFname)
 
 		end = datetime.now()

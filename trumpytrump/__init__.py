@@ -13,8 +13,6 @@ QUOTE = '"'
 DIVISION_LEN = 1000
 DIVISION_THRESHOLD = 10000
 
-csv_header = None
-
 
 utc = pytz.UTC
 
@@ -96,25 +94,14 @@ def check_dir(dir):
 
 ################################################# CSV
 
-def export_csv(data, filename):
-	global csv_header
-
+def export_csv(data, filename, category_names=[]):
 	check_dir(_dir_csv)
 	num = 1
-
-	try:
-		global category_names
-		# categories = [c for c in sorted(data[list(data.keys())[0]]["outList"].keys())]
-		category_names = sorted(category_names)
-	except IndexError as e:
-		exit(1)
 
 	with open(filename, mode="w", encoding="utf-8") as file:
 		writer = csv.writer(file, delimiter=DELIM, quotechar=QUOTE)
 
-		if not csv_header:
-			csv_header = ["#", "title", "publishDate", "wordcount"] + category_names
-		writer.writerow(csv_header)
+		writer.writerow(mk_csv_header(category_names))
 
 		sorted_data = sorted(data.items(), key=lambda x: x[1]["publishDate"])
 
@@ -132,12 +119,16 @@ def export_csv(data, filename):
 	return
 
 
-def export_filtered_csv(data, filename):
+def mk_csv_header(category_names):
+	return ["#", "title", "publishDate", "wordcount"] + category_names
+
+
+def export_filtered_csv(data, filename, category_names=[]):
 
 	with open(csv_fname(filename), "w") as csv_file:
 		writer = csv.writer(csv_file, delimiter=DELIM, quotechar=QUOTE)
 
-		header = csv_header
+		header = mk_csv_header(category_names)
 		header.remove(header[0])
 		header.insert(0, "year")
 		header.insert(1, "keyword")
@@ -207,3 +198,13 @@ def get_cached(fname, cache=True):
 	else:
 		cached_data = None
 		return None, 0, {}
+
+
+def set_category_names(names):
+	global category_names
+	category_names = names
+	return
+
+
+def get_category_names():
+	return category_names
