@@ -2,10 +2,12 @@ import os
 import csv
 import json
 import pickle
+import re
+import pytz
+
 from datetime import datetime, timedelta
 from dateutil import parser
-import pytz
-import re
+from sys import argv, exit
 
 
 DELIM = ";"

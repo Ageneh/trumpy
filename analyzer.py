@@ -1,22 +1,9 @@
-import json
-
-from sys import argv, exit
-
 from trumpytrump import *
 from trumpytrump import _file_assets, _file_export, _dir_export
 from weekly_counter import WeeklyCounter
 from word_counter import WordCounter
 from trumpytrump import fn_german, fn_german_post, fn_german_post_filtered, fn_german_pre
 from trumpytrump import _filename, base_filename, base_filename_exp
-
-
-# resultat speicher
-result = {
-	"pre": [],
-	"post": [],
-	"all": [],
-	"allSpan": [],
-}
 
 
 class Analyzer:
@@ -31,7 +18,6 @@ class Analyzer:
 		self.pre_date = scandal_date - self.delta
 		self.post_date = scandal_date + self.delta
 
-		print(self.scandal_date, weeks)
 		print("Von {} bis {}".format(self.pre_date,self.post_date))
 
 		self.keywords = set(keywords)
@@ -77,9 +63,6 @@ class Analyzer:
 
 
 		self.content_dict = {x["title"]: x for x in self.file_json if x["title"] in self.result["all"]}  # in ein dict umwandeln
-
-		pres = [self.content_dict[x] for x in self.result["pre"]]
-
 
 		# filtern nach keywords
 		filtered_data = {}
@@ -196,7 +179,6 @@ def parse_argv(year=2017, month=4, day=2):
 			duration = int(dur_arg)
 		except ValueError:
 			exit()
-
 
 	return year, month, day, duration
 

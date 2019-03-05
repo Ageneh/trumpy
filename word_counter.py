@@ -1,9 +1,7 @@
-import pickle
-
 from multiprocessing.pool import ThreadPool
-
 from trumpytrump import *
-from trumpytrump import _file_assets, _dir_export, _file_csv
+from trumpytrump import _file_assets, _dir_export, _file_csv, _file_export
+from trumpytrump.printer import Printer
 from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
 from weekly_counter import WeeklyCounter
@@ -22,7 +20,7 @@ class WordCounter:
 
     def __init__(self, cache=True):
         self.total_data = {}
-        self._cache = True
+        self._cache = cache is not None
         self.total_outlist = {}
 
         global finalDict, catList
@@ -32,6 +30,7 @@ class WordCounter:
         return
 
     def start(self):
+        self.parse_argv()
         pre = sorted(get_filenames(), reverse=True)
         post = set()
         res_lst = []
@@ -122,9 +121,11 @@ class WordCounter:
 
     def singlethreaded(self, articles, total_wc, multi_division=None):
         data = {}
+        l = len(articles)
+
         for articleNum, article in enumerate(articles):
             if multi_division and not articleNum % 25:
-                print("thread-{:<3} article #{}".format(multi_division, articleNum))
+                print("Thread-{:<3} article {}/{}".format(multi_division, articleNum, l), flush=True)
 
             res = wordCount(article["content"], finalDict, catList)
             outList, tokens, wc, classified, percClassified = res
@@ -134,8 +135,6 @@ class WordCounter:
         return data, total_wc
 
     def count_data(self, fname):
-        from trumpytrump import category_names
-
         articles = None
         start = datetime.now()
 
@@ -231,6 +230,21 @@ class WordCounter:
         string.append("{},{}".format("wordcount", total_wc))
         return "\n".join(string)
 
+    def parse_argv(self):
+        def rm_cache():
+            if os.path.exists(fn_german):
+                for file in os.listdir(_dir_export):
+                    path = _file_export.format(file)
+                    if path.endswith(".pkl"):
+                        os.remove(path)
+            return
+
+        if "-recount" in argv:
+            rm_cache()
+
+
+        return
+
 
 ################################################# I/O
 
@@ -239,25 +253,6 @@ def get_csv(fname):
     with open(fname, "r") as csv_file:
         reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
         return reader
-
-
-def export(content, filename):
-    import os
-    import datetime
-
-    if not os.path.exists("export/output/") or not os.path.isdir("export/output/"):
-        os.makedirs("export/output/")
-
-    filename = filename.split(".")
-
-    with open("{}_{}.{}".format(filename[0],
-                                str(datetime.datetime.now()),
-                                filename[-1]), "w+") as outfile:
-        for data in content:
-            outfile.write("{},{}".format(data[0], data[1]))
-            outfile.write("\n")
-
-    return filename
 
 
 def export_cache(fname, data, total_wc, total_outlist):
@@ -274,6 +269,17 @@ def get_filenames():
     dir = _dir_export
     return map(lambda x: "".join((dir, x)),
                filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
+
+
+# def getID():
+#     from random import randint
+#
+#     rand = randint(10000, 99999)
+#     while rand in IDs:
+#         rand = randint(10000, 99999)
+#     IDs.add(rand)
+#
+#     return rand
 
 
 if __name__ == '__main__':
