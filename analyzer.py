@@ -149,7 +149,7 @@ def reset_dir():
 	return
 
 
-def parse_argv(year=2017, month=4, day=2):
+def parse_argv(year=2017, month=4, day=2, duration=4):
 	global scandal_date
 	scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
 
