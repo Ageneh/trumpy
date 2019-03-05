@@ -1,7 +1,6 @@
 from multiprocessing.pool import ThreadPool
 from trumpytrump import *
 from trumpytrump import _file_assets, _dir_export, _file_csv, _file_export
-from trumpytrump.printer import Printer
 from trumpytrump.readDict import readDict
 from trumpytrump.wordCount import wordCount
 from weekly_counter import WeeklyCounter
