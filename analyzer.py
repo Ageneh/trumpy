@@ -20,30 +20,30 @@ class Analyzer:
 
 		print("Von {} bis {}".format(self.pre_date,self.post_date))
 
-		self.keywords = set(keywords)
-		self.filtered_data = {}
+		# sollten keywords mitgegben sein sollen diese als menge gespeichert werden
+		self.keywords = set(map(lambda x: x.lower(), keywords)) if keywords else set()
 		self.result = {
 			"pre": [],
 			"post": [],
 			"all": [],
 			"allSpan": [],
-			"postFiltered": {},
+			"postFiltered": {},  # ein dictionairy wo die gefilterten artikel gespeichert werden
 		}
 		self.content_dict = {}
+
+		to_datetime = lambda x: parser.parse(x).replace(tzinfo=utc)
 
 		with open(_filename, mode="r", encoding="utf-8") as file:
 			self.file_json = json.load(file)
 			self.jsonDict = {x["title"]: x for x in self.file_json}
+
 			for k in self.jsonDict:
 				date = self.jsonDict[k]["publishDate"]
-				self.jsonDict[k]["publishDate"] = parser.parse(date).replace(tzinfo=utc)
-
-		print("Anzahl aller Artikel:", len(self.file_json))
+				self.jsonDict[k]["publishDate"] = to_datetime(date)
 
 		return
 
 	def filter(self):
-
 		for title, entry in self.jsonDict.items():
 			# herausfiltern aller deutschen artikel
 			if re.search("(country_de_Deutschland)", entry.get("tags2", "")):
@@ -80,8 +80,10 @@ class Analyzer:
 					word_data.append(article)
 					filtered_data[p_date.year][word] = word_data
 
-		self.content_dict["postFiltered"] = filtered_data
+			if len(filtered_data[p_date.year]) < 1:
+				filtered_data.pop(p_date.year)
 
+		self.result["postFiltered"] = filtered_data
 		return
 
 	def export(self):
@@ -100,14 +102,15 @@ class Analyzer:
 		print("Anzahl der deutschen Artikel ({} - {}):".format(str(scandal_date), str(self.post_date)), len(exp))
 		export(exp, fn_german_post)
 
-		export(self.content_dict["postFiltered"], fn_german_post_filtered)
-		if len(self.content_dict["postFiltered"]) > 0:
+		export(self.result["postFiltered"], fn_german_post_filtered)
+		if len(self.result["postFiltered"]) > 0:
 			print("Gefilterte Artikel ({} - {}):".format(str(scandal_date), str(self.post_date)))
-			for year in sorted(self.filtered_data.keys()):
+			filtered = self.result["postFiltered"]
+			for year in sorted(filtered.keys()):
 				print("Jahr:", year)
-				for w in sorted(self.filtered_data[year]):
-					articles_per_word = self.filtered_data[year][w]
-					print("\"{}\":".format(w), ", ".join(["\'{}\'".format(x["title"]) for x in articles_per_word]))
+				for w in sorted(filtered[year]):
+					articles_per_word = filtered[year][w]
+					print("\"{}\": {:<5} articles".format(w, str(len(articles_per_word))))
 				print("")
 
 		return
@@ -149,7 +152,7 @@ def reset_dir():
 	return
 
 
-def parse_argv(year=2017, month=4, day=2):
+def parse_argv(year=2017, month=4, day=2, duration=4):
 	global scandal_date
 	scandal_date = datetime(year=year, month=month, day=day).replace(tzinfo=utc)
 
@@ -189,16 +192,21 @@ if __name__ == '__main__':
 	keywords = ["Familie"]
 	analyzer = Analyzer(keywords).start()
 
-	print("Analyzer time: {}".format(str(datetime.now() - started)))
+	ended = datetime.now()
+	elapsed = ended - started
+	print("Analyzer time: {}".format(elapsed))
 
 	if input("WordCount errechnen? (y/n) - ").lower() == "y":
+		ended = None
 		counter = WordCounter()
 		counter.start()
 
 		weekly = WeeklyCounter(counter)
 		weekly.start()
 
-	ended = datetime.now()
-	print("Time started: {}".format(ended - started))
-	print("Time ended: {}".format(ended - started))
-	print("Total time running: {}".format(ended - started))
+	if not ended: ended = datetime.now()
+
+	elapsed = ended - started
+	print("Time started: {}".format(started))
+	print("Time ended: {}".format(ended))
+	print("Total time running: {}".format(elapsed))

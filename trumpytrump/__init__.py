@@ -154,7 +154,6 @@ def export_filtered_csv(data, filename, category_names=[]):
 
 ################################################# EXCEL
 
-
 def csv_to_excel(filename, cols=None):
 	from xlsxwriter.workbook import Workbook
 

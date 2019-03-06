@@ -241,7 +241,6 @@ class WordCounter:
         if "-recount" in argv:
             rm_cache()
 
-
         return
 
 
@@ -268,17 +267,6 @@ def get_filenames():
     dir = _dir_export
     return map(lambda x: "".join((dir, x)),
                filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
-
-
-# def getID():
-#     from random import randint
-#
-#     rand = randint(10000, 99999)
-#     while rand in IDs:
-#         rand = randint(10000, 99999)
-#     IDs.add(rand)
-#
-#     return rand
 
 
 if __name__ == '__main__':
