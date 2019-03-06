@@ -8,7 +8,7 @@ from trumpytrump import _filename, base_filename, base_filename_exp
 
 class Analyzer:
 
-	def __init__(self, *keywords, overwrite=False):
+	def __init__(self, keywords, overwrite=False):
 		self.overwrite = True if overwrite else False
 
 		# zeitspanne
@@ -186,7 +186,8 @@ def parse_argv(year=2017, month=4, day=2):
 if __name__ == '__main__':
 	started = datetime.now()
 
-	analyzer = Analyzer().start()
+	keywords = ["Familie"]
+	analyzer = Analyzer(keywords).start()
 
 	print("Analyzer time: {}".format(str(datetime.now() - started)))
 
