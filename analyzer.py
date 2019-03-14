@@ -119,6 +119,20 @@ class Analyzer:
 		self.filter()
 		self.export()
 
+		print("- " * 20)
+		print("Mit Duplikate:")
+		print("Alle Artikel:", len(self.file_json))
+		print("Deutsche Artikel:", len(set(x["id"] for x in self.file_json if re.search("(country_de_Deutschland)", x.get("tags2", "")))))
+		print("- " * 20)
+		print("Ohne Duplikate:")
+		print("Alle Artikel: {}".format(len(set(x["title"] for x in self.file_json))))
+		print("Deutsche Artikel: {}".format(len(self.result["all"])))
+		print("Deutsche Artikel in Zeitspanne: {}".format(len(self.result["allSpan"])))
+		print("Deutsche Artikel vor Skandal: {}".format(len(self.result["pre"])))
+		print("Deutsche Artikel nach Skandal: {}".format(len(self.result["post"])))
+		print("- " * 20)
+		return
+
 
 def export(content, filename):
 	try:
