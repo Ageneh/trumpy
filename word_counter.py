@@ -17,264 +17,334 @@ finalDict, catList = None, None
 
 class WordCounter:
 
-    def __init__(self, cache=True):
-        self.total_data = {}
-        self._cache = cache is not None
-        self.total_outlist = {}
+	def __init__(self, cache=True):
+		self.total_data = {}
+		self._cache = cache is not None
+		self.total_outlist = {}
 
-        global finalDict, catList
-        finalDict, catList = readDict(LIWC_de)
-        self.category_names = sorted(wordCount("", finalDict, catList)[0].keys())
+		# speichere alle möglichen Kategorie-Titel
+		global finalDict, catList
+		finalDict, catList = readDict(LIWC_de)
+		self.category_names = sorted(wordCount("", finalDict, catList)[0].keys())
 
-        return
+		return
 
-    def start(self):
-        self.parse_argv()
-        pre = sorted(get_filenames(), reverse=True)
-        post = set()
-        res_lst = []
+	def start(self):
+		"""
+		Bereitet die Dateinamen und die Prozesse vor welche ausgeführt werden.
+		Erstellt die benötigten Listen pre und post damit beim errechnen keine Konflikte entstehen, falls benötigte
+		Daten nicht vorliegen sollten.
 
-        for idx, fname in enumerate(pre, start=0):
-            if "_gefiltert.json" in fname:
-                post.add(fname)
-                pre.remove(fname)
+		pre: eine Liste mit den Dateien welche zu erst verrechnet werden sollen.
+		post: eine Liste mit den Dateien welche nach pre verrechnet werden.
+		res_lst: eine Liste mit den Ergebnissen.
+		"""
 
-        pool = ThreadPool(processes=len(pre))
-        res_lst += [x for x in pool.map(self.count_data, pre)]
-        pool.close()
-        pool.join()
-        pool.terminate()
+		self.parse_argv()
+		pre = sorted(get_filenames(), reverse=True)
+		post = set()
+		res_lst = []
 
-        pool = ThreadPool(processes=len(post))
-        res_lst += [x for x in pool.map(self.count_data, post)]
-        pool.close()
-        pool.join()
-        pool.terminate()
+		for idx, fname in enumerate(pre, start=0):
+			if "_gefiltert.json" in fname:
+				# die nach keywords gefilterten Dateien sollen erst zum Schluss verrechnet werden
+				post.add(fname)
+				pre.remove(fname)
 
-        return res_lst
+		pool = ThreadPool(processes=len(pre))
+		res_lst += [x for x in pool.map(self.count_data, pre)]
+		pool.close()
+		pool.join()
+		pool.terminate()
 
-    def set_data(self, data, article, wordCount):
-        outList, tokens, wc, classified, percClassified = wordCount
+		pool = ThreadPool(processes=len(post))
+		res_lst += [x for x in pool.map(self.count_data, post)]
+		pool.close()
+		pool.join()
+		pool.terminate()
 
-        data[article["title"]] = {
-            "title": article["title"],
-            "outList": outList,
-            "publishDate": article["publishDate"],
-            "wc": wc,
-            "classified": classified,
-            "percClassified": percClassified
-        }
+		return res_lst
 
-        return data
+	def set_data(self, data, article, wordCount):
+		outList, tokens, wc, classified, percClassified = wordCount
 
-    def multithread(self, articles, total_wc):
+		data[article["title"]] = {
+			"title": article["title"],
+			"outList": outList,
+			"publishDate": article["publishDate"],
+			"wc": wc,
+			"classified": classified,
+			"percClassified": percClassified
+		}
 
-        def count_multithreaded(vals):
-            start = vals[0]
-            end_incl = vals[1]
-            division = vals[2]
+		return data
 
-            print("---- Counting Divison #{}/{} Started ----".format(division, divisons))
+	def multithread(self, articles, total_wc):
+		'''
+		Teilt die komplette Artikel-Liste in mehrere Teile auf und errechnet die Häufigkeiten für jeden Teil.
 
-            total_wc = 0
-            data = {}
-            articles_span = articles[start:end_incl]
-            data, total_wc = self.singlethreaded(articles_span, total_wc, multi_division=division)
+		:param articles: Die gesamte Artikel-Liste.
+		:param total_wc: Die gesamte Wortanzahl.
+		:return: Gibt das gesamte Resultat und total_wc zurück.
+		'''
 
-            print("Divison #{}".format(division))
+		def count_multithreaded(vals):
+			'''
+			Ruft singlethreaded() mit dem jeweiligen Teil auf.
+			'''
 
-            msg = "---- Counting Divison #{} Successful ----".format(division)
+			start = vals[0]
+			end_incl = vals[1]
+			division = vals[2]
 
-            print("-" * len(msg))
-            print(msg)
-            print("-" * len(msg))
+			print("---- Counting Divison #{}/{} Started ----".format(division, divisons))
 
-            return data, total_wc
+			total_wc = 0
+			data = {}
+			# ein Ausschnitt/eine bestimmte Menge von Artikeln aus articles
+			articles_span = articles[start:end_incl]
+			# rufe singlethreaded zum berechnen der Häufigkeiten der Artikel des Ausschnitts auf
+			data, total_wc = self.singlethreaded(articles_span, total_wc, multi_division=division)
 
-        args = []
-        divisons = int(len(articles) / DIVISION_LEN)
-        length = len(articles)
-        start = 0
-        end = DIVISION_LEN
+			print("Divison #{}".format(division))
+			msg = "---- Counting Divison #{} Successful ----".format(division)
+			print("-" * len(msg))
+			print(msg)
+			print("-" * len(msg))
 
-        for div in range(divisons + 1):
-            args.append([start, end, div])
+			return data, total_wc
 
-            start = end
-            end += DIVISION_LEN
-            end = length if end >= length else end
+		args = []
+		divisons = int(len(articles) / DIVISION_LEN)
+		length = len(articles)
+		start = 0
+		end = DIVISION_LEN
 
-        pool = ThreadPool(processes=divisons + 1)
-        res = pool.map(count_multithreaded, args)
-        pool.close()
-        pool.join()
+		for div in range(divisons + 1):
+			args.append([start, end, div])
 
-        data = {}
-        for r in res:
-            for title, v in r[0].items():
-                data[title] = v
+			start = end
+			end += DIVISION_LEN
+			end = length if end >= length else end
 
-            total_wc += r[1]
+		pool = ThreadPool(processes=divisons + 1)
+		res = pool.map(count_multithreaded, args)
+		pool.close()
+		pool.join()
 
-        return data, total_wc
+		# summiere die Ergebnisse der einzelnen Teile
+		data = {}
+		for r in res:
+			for title, v in r[0].items():
+				data[title] = v
 
-    def singlethreaded(self, articles, total_wc, multi_division=None):
-        data = {}
-        l = len(articles)
+			total_wc += r[1]
 
-        for articleNum, article in enumerate(articles):
-            if multi_division and not articleNum % 25:
-                print("Thread-{:<3} article {}/{}".format(multi_division, articleNum, l), flush=True)
+		return data, total_wc
 
-            res = wordCount(article["content"], finalDict, catList)
-            outList, tokens, wc, classified, percClassified = res
-            total_wc += classified
-            data = self.set_data(data, article, res)
+	def singlethreaded(self, articles, total_wc, multi_division=None):
+		'''
+		Durchläuft alle gegebenen Artikel und ruft für jeden Artikel wordCount auf.
 
-        return data, total_wc
+		:param articles: Eine Liste mit den Artikeln.
+		:param total_wc: Die gesamte Wort-Anzahl.
+		:param multi_division: Die Nummer der Teilung.
+		:return: Gibt einen tuple mit dem Resultat für die Artikel und die gesamte Wort-Anzahl zurück.
+		'''
 
-    def count_data(self, fname):
-        articles = None
-        start = datetime.now()
+		data = {}
+		l = len(articles)
 
-        is_filtered = False
+		for articleNum, article in enumerate(articles):
+			if multi_division and not articleNum % 25:
+				print("Thread-{:<3} article {}/{}".format(multi_division, articleNum, l), flush=True)
 
-        print("Thread : {}".format(fname))
-        with open(fname, "r") as file:
-            if fname.split("/")[-1].endswith("_gefiltert.json"):
-                is_filtered = True
-            else:
-                json_f = json.load(file)
+			# rufe wordCount auf
+			res = wordCount(article["content"], finalDict, catList)
+			outList, tokens, wc, classified, percClassified = res
+			total_wc += classified
+			data = self.set_data(data, article, res)
 
-                try:
-                    articles = [x for x in json_f]
-                except TypeError:
-                    return
+		return data, total_wc
 
-                if articles == {}:
-                    return
+	def count_data(self, fname):
+		'''
+		Erwartet einen Dateinamen einer JSON-Datei. Diese wird dann gelesen und je nachdem welche Datei gegeben ist,
+		wird diese analysiert. Sollte für die gegebene Datei bereits eine cache Datei vorhanden sein, so wird die
+		cache-Datei verwendet. In der cache-Datei sind die relativen Häufigkeiten und Werte bereitsberechnet und müssen
+		nur noch eingelesen werden. Sollte dies jedoch nicht der Fall sein, so wird, nachdem das Resultat - sprich die
+		relativen Häufigkeiten - errechnet wurde die cache Datei erstellt.
+		Zudem wird auch das Erstellen der CSV- und Excel-Dateien hier initiiert.
 
-            data, total_wc, total_outlist = get_cached(cache_fname(fname))
+		:param fname: Der Dateiname einer JSON Datei.
+		:return:
+		'''
 
-            if is_filtered:
-                data, wc, outlist = self.count_filtered(fname)
+		articles = None
+		start = datetime.now()
 
-                export_cache(fname, data, wc, outlist)
-                export_filtered_csv(data, fname, category_names=self.category_names)
-                csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
-            else:
-                if not data:
-                    data, total_wc = self.multithread(articles[:], total_wc)
+		is_filtered = False
 
-                    for d in data.values():
-                        for k, v in d["outList"].items():
-                            total_outlist[k] = total_outlist.get(k, 0) + v
+		print("Thread : {}".format(fname))
+		with open(fname, "r") as file:
+			if fname.split("/")[-1].endswith("_gefiltert.json"):
+				is_filtered = True
+			else:
+				json_f = json.load(file)
 
-                    for k, v in data.items():
-                        wc = int(v["wc"])
-                        for cat, count in v["outList"].items():
-                            count = int(count)
-                            data[k]["outList"][cat] = 100 * (count / wc)
+				try:
+					articles = [x for x in json_f]
+				except TypeError:
+					return
 
-                    export_cache(fname, data, total_wc, total_outlist)
+				if articles == {}:
+					return
 
-                if fn_german in fname:
-                    global total_data
-                    self.total_data = data
-                    self.total_outlist = total_outlist
+			# lade, falls vorhanden, die cache-Dateien ein
+			data, total_wc, total_outlist = get_cached(cache_fname(fname))
 
-                csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
-                export_csv(data, csvFname, category_names=self.category_names)
-                csv_to_excel(csvFname)
+			# Fallunterscheidung: wenn die aktuelle Datei nach Jahr und Keyword gefiltert ist so nutze count_filtered()
+			# im die Häufigkeiten zu erhalten.
+			# ansonsten: nutze multithread()
+			if is_filtered:
+				data, wc, outlist = self.count_filtered(fname)
 
-        end = datetime.now()
-        diff = end - start
+				export_cache(fname, data, wc, outlist)
+				export_filtered_csv(data, fname, category_names=self.category_names)
+				csv_to_excel(csv_fname(fname), cols=[[2, 2, 60]])
+			else:
+				# Fallunterscheidung:
+				# wenn eine cache-Datei vorhanden ist und damit data nicht None ist werden die Werte einfach eingelesen
+				# ansonsten: berechne die Häufigkeiten mit multithread() und schreibe anschließend das Ergebnis in die cache
+				if not data:
+					data, total_wc = self.multithread(articles[:], total_wc)
 
-        return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
+					# summieren der einzelnen Häufigkeiten
+					for d in data.values():
+						for k, v in d["outList"].items():
+							total_outlist[k] = total_outlist.get(k, 0) + v
 
-    def count_filtered(self, fname):
-        global total_data, total_wc
-        if not total_data:
-            total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
+					# relativiere die absoluten Häufigkeiten
+					for k, v in data.items():
+						wc = int(v["wc"])
+						for cat, count in v["outList"].items():
+							count = int(count)
+							data[k]["outList"][cat] = 100 * (count / wc)
 
-        outlist = []
-        wc = 0
-        json_f = json.load(open(fname, mode="rb"))
-        filtered_data = {}
+					export_cache(fname, data, total_wc, total_outlist)
 
-        for year in json_f.keys():
-            year_data = {}
+				if fn_german in fname:
+					# speichere das Ergebnis mit allen deutschen Arikeln ab
+					global total_data
+					self.total_data = data
+					self.total_outlist = total_outlist
 
-            for kw, content in json_f[year].items():
-                kw_data = []
-                for article in content:
-                    kw_data.append(total_data[article["title"]])
-                    wc += int(total_data[article["title"]]["wc"])
-                    outlist += total_data[article["title"]]["outList"]
+				csvFname = _file_csv.format(fname.split("/")[-1].split(".")[0])
+				export_csv(data, csvFname, category_names=self.category_names)
+				csv_to_excel(csvFname)
 
-                year_data[kw] = kw_data
+		end = datetime.now()
+		diff = end - start
 
-            filtered_data[year] = year_data
+		return "file: {:<40} len: {:<10} time: {}".format(fname.split("/")[-1], len(articles) if articles else 0, diff)
 
-        return filtered_data, wc, outlist
+	def count_filtered(self, fname):
+		'''
+		Eine gesonderte Zähl-Funktion für die Artikel, welche nach Keyword pro Jahr gefiltert sind.
+		Wird benötigt, da das Format der JSON-Datei für die gefilterten Artikel nicht wie das der restlichen JSONs ist
+		und dadurch anders behandelt wird.
 
-    def count_rel(self, total_wc, outlist=None):
-        if not outlist:
-            outlist = self.total_outlist
+		:param fname: Der Dateipfad der gefilterten JSON.
+		:return: Gibt die Häufigkeiten für die gefilterten Artikel zurück.
+		'''
 
-        string = []
-        for k, v in list(sorted(outlist.items(), key=lambda x: x[0])):
-            string.append("{},{}%".format(k, str(100 * (v / total_wc))))
+		global total_data, total_wc
+		if not total_data:
+			# sollte die Variable für alle deutschen Arikel nicht gegeben sein, ließ die Werte aus der cache-Datei ein
+			total_data, total_wc, total_outlist = get_cached(cache_fname(fn_german))
 
-        string.append("{},{}".format("wordcount", total_wc))
-        return "\n".join(string)
+		outlist = []
+		wc = 0
+		json_f = json.load(open(fname, mode="rb"))
+		filtered_data = {}
 
-    def parse_argv(self):
-        def rm_cache():
-            if os.path.exists(fn_german):
-                for file in os.listdir(_dir_export):
-                    path = _file_export.format(file)
-                    if path.endswith(".pkl"):
-                        os.remove(path)
-            return
+		for year in json_f.keys():
+			year_data = {}
 
-        if "-recount" in argv:
-            rm_cache()
+			for kw, content in json_f[year].items():
+				kw_data = []
+				for article in content:
+					kw_data.append(total_data[article["title"]])
+					wc += int(total_data[article["title"]]["wc"])
+					outlist += total_data[article["title"]]["outList"]
 
-        return
+				year_data[kw] = kw_data
+
+			filtered_data[year] = year_data
+
+		return filtered_data, wc, outlist
+
+	def parse_argv(self):
+		def rm_cache():
+			if os.path.exists(fn_german):
+				for file in os.listdir(_dir_export):
+					path = _file_export.format(file)
+					if path.endswith(".pkl"):
+						os.remove(path)
+			return
+
+		if "-recount" in argv:
+			rm_cache()
+
+		return
 
 
 ################################################# I/O
 
 
 def get_csv(fname):
-    with open(fname, "r") as csv_file:
-        reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
-        return reader
+	'''
+	Ließt den Inhalt einer gegebenen CSV-Datei.
+	:param fname: Der Datei-Pfad der CSV-Datei.
+	:return: Gibt den Inhalt der CSV zurück.
+	'''
+
+	with open(fname, "r") as csv_file:
+		reader = csv.reader(csv_file, delimiter=DELIM, quotechar=QUOTE)
+		return reader
 
 
 def export_cache(fname, data, total_wc, total_outlist):
-    if not _cache: return
+	'''
+	Speichert eine cache ab.
 
-    with open(cache_fname(fname), "wb") as stream:
-        pickle.dump((data, total_wc, total_outlist), stream)
+	:param fname: Der Dateiname der originalen Datei.
+	:param data: Der Inhalt welcher gespeichert werden soll.
+	:param total_wc: Die gesamte Anzahl aller Wörter.
+	:param total_outlist: Die Anzahl der Wörter für jede Kategorie.
+	'''
 
-    return
+	if not _cache: return
+
+	with open(cache_fname(fname), "wb") as stream:
+		pickle.dump((data, total_wc, total_outlist), stream)
+
+	return
 
 
 def get_filenames():
-    global filenames
-    dir = _dir_export
-    return map(lambda x: "".join((dir, x)),
-               filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
+	global filenames
+	dir = _dir_export
+	return map(lambda x: "".join((dir, x)),
+			   filter(lambda x: x.startswith("export") and x.endswith(".json"), os.listdir(dir)))
 
 
 if __name__ == '__main__':
-    counter = WordCounter()
-    res = counter.start()
+	counter = WordCounter()
+	res = counter.start()
 
-    w = WeeklyCounter(total_data)
-    w.start()
-    w.export()
+	w = WeeklyCounter(total_data)
+	w.start()
+	w.export()
 
-    for r in res: print(r)
+	for r in res: print(r)

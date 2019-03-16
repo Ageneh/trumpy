@@ -93,9 +93,6 @@ def check_dir(dir):
 	return
 
 
-
-################################################# CSV
-
 def export_csv(data, filename, category_names=[]):
 	check_dir(_dir_csv)
 	num = 1
@@ -152,8 +149,6 @@ def export_filtered_csv(data, filename, category_names=[]):
 	return
 
 
-################################################# EXCEL
-
 def csv_to_excel(filename, cols=None):
 	from xlsxwriter.workbook import Workbook
 
@@ -188,8 +183,6 @@ def csv_to_excel(filename, cols=None):
 def file_exists(fname):
 	return os.path.exists(fname)
 
-
-################################################# IO
 
 def get_cached(fname, cache=True):
 	if cache and os.path.exists(fname):

@@ -17,6 +17,10 @@ stopword_instance = None
 
 
 def dump_stopword(fname, stopwords):
+	'''
+	Speichert die cache der stopwords wenn diese noch nicht existieren sollte.
+	'''
+
 	import os
 	import pickle
 	if not os.path.exists(fname):
@@ -25,6 +29,16 @@ def dump_stopword(fname, stopwords):
 
 
 def load_stopwords(count=0):
+	'''
+	Lädt die stopwords.
+	Sollte die cache für die Stopwords im assets-Ordner vorhanden sein wird diese eingelesen.
+	Ansonsten: sollte das Modul nltk vorhanden sein werden die stopwords geladen.
+	Falls beides nicht möglich sein wird eine Aufforderung zum Ausführen der benötigten Befehle ausgegeben.
+
+	:param count:
+	:return:
+	'''
+
 	import os, pickle
 
 	global stopword_instance
@@ -32,6 +46,7 @@ def load_stopwords(count=0):
 	fname = _file_assets.format("stopwords_cache.pkl")
 
 	if count > 1:
+		# sollte Problem weiterhin bestehen fordere Nutzer auf
 		raise RuntimeError("\n\nYou need to download stopwords.\nPlease run following command in your terminal: \n\nimport nltk\nnltk.download('stopwords')")
 
 	if stopword_instance:
@@ -43,15 +58,19 @@ def load_stopwords(count=0):
 			return stopword_instance
 	else:
 		try:
+			# versuche die stopwords über nltk herunterzuladen
 			stopwords = s_words.words("german")
+			# bei Erfolg: speichere die stopwords als pickle-cache
 			dump_stopword(fname, stopwords)
 			return stopwords
 		except BaseException:
+			# sollte ein Problem weiterhin bestehen versuche das ganz noch ein weiteres Mal
 			nltk.download('stopwords')
 			load_stopwords(count=count+1)
 
 
 def wordCount(data, dictOutput, catList):
+	# lade die stopwords
 	stopwords = load_stopwords()
 
 	# Create a new dictionary for the output
@@ -70,8 +89,12 @@ def wordCount(data, dictOutput, catList):
 	fdist = nltk.FreqDist(tokens)
 	wc = len(tokens)
 
-	# Using the Porter stemmer for wildcards, create a stemmed version of the data
+	# Using the Cistem stemmer for wildcards, create a stemmed version of the data
+	# Cistem: needed for german words/stemming
 	cistem = Cistem()
+
+	# wenn ein Wort in den stopwords vorkommt, ignoriere dieses
+	# ansonsten: speichere dies in der Liste
 	stems = [cistem.stem(word) for word in tokens if word not in stopwords and len(word) > 0]
 	fdist_stem = nltk.FreqDist(stems)
 
