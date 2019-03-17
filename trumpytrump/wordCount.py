@@ -93,8 +93,8 @@ def wordCount(data, dictOutput, catList):
 	# Cistem: needed for german words/stemming
 	cistem = Cistem()
 
-	# wenn ein Wort in den stopwords vorkommt, ignoriere dieses
-	# ansonsten: speichere dies in der Liste
+	# wenn ein Wort/Token in den stopwords vorkommt, ignoriere dieses
+	# ansonsten: speichere das gestemmte Wort in der Liste
 	stems = [cistem.stem(word) for word in tokens if word not in stopwords and len(word) > 0]
 	fdist_stem = nltk.FreqDist(stems)
 

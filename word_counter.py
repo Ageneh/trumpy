@@ -90,7 +90,7 @@ class WordCounter:
 
 		def count_multithreaded(vals):
 			'''
-			Ruft singlethreaded() mit dem jeweiligen Teil auf.
+			Ruft count() mit dem jeweiligen Teil auf.
 			'''
 
 			start = vals[0]
@@ -104,7 +104,7 @@ class WordCounter:
 			# ein Ausschnitt/eine bestimmte Menge von Artikeln aus articles
 			articles_span = articles[start:end_incl]
 			# rufe singlethreaded zum berechnen der Häufigkeiten der Artikel des Ausschnitts auf
-			data, total_wc = self.singlethreaded(articles_span, total_wc, multi_division=division)
+			data, total_wc = self.count(articles_span, total_wc, multi_division=division)
 
 			print("Divison #{}".format(division))
 			msg = "---- Counting Divison #{} Successful ----".format(division)
@@ -142,7 +142,7 @@ class WordCounter:
 
 		return data, total_wc
 
-	def singlethreaded(self, articles, total_wc, multi_division=None):
+	def count(self, articles, total_wc, multi_division=None):
 		'''
 		Durchläuft alle gegebenen Artikel und ruft für jeden Artikel wordCount auf.
 
