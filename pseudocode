@@ -1,40 +1,40 @@
-program wordCount
+program wordCount:
 
-def wordCount(data, dictOutput, catList):
-    loadStopwords() # load stopwords for denoising of data
+    def wordCount(data, dictOutput, catList):
+        loadStopwords() # load stopwords for denoising of data
 
-    outList = data.lower() # format data to lowercase
-    tokens = tokenize() # tokenize the reformatted data
-    freqDist = FreqDist(tokes) # create a frequency distribution of tokens
-    wc = len(tokens)
+        outList = data.lower() # format data to lowercase
+        tokens = tokenize() # tokenize the reformatted data
+        freqDist = FreqDist(tokes) # create a frequency distribution of tokens
+        wc = len(tokens)
 
-    stems = []
-    for each token t in tokens:
-        if token in tokens:
-            # ignore token which is a stopword
-            continue
-        else:
-            # only stem tokens which are not stopwords
-            # and add to stems
-            stems.append(stem(t))
-
-
-    classified = 0
-
-    for each word w in dictOutput:
-        categoriesOfWord = dictOutput.get(w)
-        for each category c in categoriesOfWord:
-            if w not in (fDist and stems):
+        stems = []
+        for each token t in tokens:
+            if token in tokens:
+                # ignore token which is a stopword
                 continue
+            else:
+                # only stem tokens which are not stopwords
+                # and add to stems
+                stems.append(stem(t))
 
-            # count up the amount of words per category c by adding
-            # the frequency of w in freqDist to the current amount
-            # of words in c
-            classified++
 
-    percClassified = # calculate the percentage of classified words
+        classified = 0
 
-return [outList, tokens, wc, classified, percClassified]
+        for each word w in dictOutput:
+            categoriesOfWord = dictOutput.get(w)
+            for each category c in categoriesOfWord:
+                if w not in (fDist and stems):
+                    continue
+
+                # count up the amount of words per category c by adding
+                # the frequency of w in freqDist to the current amount
+                # of words in c
+                classified++
+
+        percClassified = # calculate the percentage of classified words
+
+        return [outList, tokens, wc, classified, percClassified]
 
 
 
